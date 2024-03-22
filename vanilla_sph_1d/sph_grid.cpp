@@ -30,20 +30,21 @@ struct vec2d {
     }
 };
 
-const int width = 1000;
-const int height = 600;
-const float h = 10.0f;
+const int width = 900;
+const int height = 500;
+const float h = 16.0f;
 const float dt = 0.01f;
 const float mass = 10.0f; //all particles have the same mass
 const float specific_entropy = 1.0f; 
 const float adiabatic_index = 2.0f; //this and above constant gives us the state equation p=K \rho^{\gamma}
 const float damping = -0.5f; //bounce damping
 const vec2d g = {0.0f , 0.0f};
+const int N = 5000; //Number of particle
 
-const int gridWidth = 40; // Number of grid cells horizontally
-const int gridHeight = 22; // Number of grid cells vertically
+const int gridWidth = (int)(width/h); // Number of grid cells horizontally
+const int gridHeight = (int)(height/h); // Number of grid cells vertically
 const int numCells = gridWidth * gridHeight;
-const int maxParticlesPerCell = 50; // Maximum number of particles in a grid cell
+const int maxParticlesPerCell = 100; // Maximum number of particles in a grid cell
 
 struct particle {
     vec2d pos;
@@ -216,7 +217,7 @@ int main() {
     std::uniform_real_distribution<float> distV(-100.0f, 100.0f); // Uniform distribution for velocity
 
     // Initialize particles with random speeds and assign them to grid cells
-    for (int i = 0; i < 6000; i++) {
+    for (int i = 0; i < N; i++) {
         float randomX = distX(gen);
         float randomY = distY(gen);
         float randomVx = distV(gen);
