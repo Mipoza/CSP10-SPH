@@ -38,7 +38,7 @@ const float mass = 10.0f; //all particles have the same mass
 const float specific_entropy = 1.0f; 
 const float adiabatic_index = 2.0f; //this and above constant gives us the state equation p=K \rho^{\gamma}
 const float damping = -0.5f; //bounce damping
-const vec2d g = {0.0f , 1.0f};
+const vec2d g = {0.0f , 9.82f};
 
 
 struct particle {
