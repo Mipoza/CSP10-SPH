@@ -1,5 +1,6 @@
 #include <iostream>
 #include <cstdlib>
+#include <random>
 #include <math.h>
 #include <vector>
 #include <SFML/Graphics.hpp>
@@ -28,12 +29,15 @@ struct vec2d {
     }
 };
 
-const float h = 0.5f;
-const float dt = 0.001f;
+const int width = 200;
+const int height = 300;
+const float h = 4.0f;
+const float dt = 0.01f;
 const float mass = 1.0f; //all particles have the same mass
 const float specific_entropy = 1.0f; 
 const float adiabatic_index = 2.0f; //this and above constant gives us the state equation p=K \rho^{\gamma}
-const vec2d g = {0.0f , -9.8f};
+const float damping = -0.5f; //bounce damping
+const vec2d g = {0.0f , 9.82f};
 
 
 struct particle {
@@ -109,13 +113,26 @@ void compute_acceleration(std::vector<particle> &particles) {
 }
 
 void integrate(std::vector<particle> &particles) {
-    //todo
     for (auto &p_a : particles) {   
 
+        //simple Euleur explicit scheme
         p_a.v = p_a.v + dt*p_a.a;
         p_a.pos = p_a.pos + dt*p_a.v;
 
-        //need to add bounduary condition 
+        //boundary conditions 
+        int boundary = 5.0f;
+        if(p_a.pos.y + boundary  > height){
+            p_a.v = {p_a.v.x, damping*p_a.v.y};
+            p_a.pos.y = height - boundary;
+        }
+        if(p_a.pos.x - boundary < 0){
+            p_a.v = {damping*p_a.v.x, p_a.v.y};
+            p_a.pos.x =  boundary; 
+        }
+        if(p_a.pos.x + boundary > width){
+            p_a.v = {damping*p_a.v.x, p_a.v.y};
+            p_a.pos.x =  width - boundary; 
+        }
     }
 }
 
@@ -126,14 +143,20 @@ void update(std::vector<particle> &particles) {
 }
 
 int main() {
-
-    sf::RenderWindow window(sf::VideoMode(800, 600), "SPH Simulation");
+    sf::RenderWindow window(sf::VideoMode(width, height), "SPH Simulation");
 
     std::vector<particle> particles;
 
+    std::random_device rd; 
+    std::mt19937 gen(rd()); 
+    std::uniform_real_distribution<float> distX(-10.0f, 10.0f); // Uniform distribution for x velocity
+    std::uniform_real_distribution<float> distY(0.0f, 10.0f); // Uniform distribution for y velocity
+
     // Initialize particles
-    for (int i = 0; i < 50; i++) {
-        particles.push_back(particle({(i % 10) * 0.25f + 200.0f, (float)(i / 10)}, {0.0f, 0.0f}, {0.0f, 0.0f}, 0.0, 0.0));
+    for (int i = 0; i < 400; i++) {
+        float randomVx = distX(gen); 
+        float randomVy = distY(gen); 
+        particles.push_back(particle({(i % 50) * 1.5f + width/4.0f, (float)(i / 50) *2.0f + height/4.0f}, {randomVx, randomVy}, {0.0f, 0.0f}, 0.0, 0.0));
     }
 
     // Main loop
@@ -152,7 +175,7 @@ int main() {
         for (const auto& p : particles) {
             sf::CircleShape circle(5.0f);
             circle.setFillColor(sf::Color::Blue);
-            circle.setPosition(p.pos.x , -p.pos.y); 
+            circle.setPosition(p.pos.x , p.pos.y); 
             window.draw(circle);
         }
 
