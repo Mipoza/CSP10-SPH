@@ -2,6 +2,7 @@
 #include <cstdlib>
 #include <math.h>
 #include <vector>
+#include <SFML/Graphics.hpp>
 
 struct vec2d {
     float x, y;
@@ -27,12 +28,12 @@ struct vec2d {
     }
 };
 
-const float h = 1.0f;
-const float dt = 0.01f;
+const float h = 0.5f;
+const float dt = 0.001f;
 const float mass = 1.0f; //all particles have the same mass
 const float specific_entropy = 1.0f; 
 const float adiabatic_index = 2.0f; //this and above constant gives us the state equation p=K \rho^{\gamma}
-const vec2d g = {0.0f , -9.82f};
+const vec2d g = {0.0f , -9.8f};
 
 
 struct particle {
@@ -126,21 +127,37 @@ void update(std::vector<particle> &particles) {
 
 int main() {
 
+    sf::RenderWindow window(sf::VideoMode(800, 600), "SPH Simulation");
+
     std::vector<particle> particles;
 
-    for(int i = 0; i < 50; i++){
-            particles.push_back(particle({(i % 10) * 0.25f , (float)(i/10) }, {0.0f , 0.0f}, {0.0f , 0.0f}, 0.0, 0.0));
+    // Initialize particles
+    for (int i = 0; i < 50; i++) {
+        particles.push_back(particle({(i % 10) * 0.25f + 200.0f, (float)(i / 10)}, {0.0f, 0.0f}, {0.0f, 0.0f}, 0.0, 0.0));
     }
 
+    // Main loop
+    while (window.isOpen()) {
+        sf::Event event;
+        while (window.pollEvent(event)) {
+            if (event.type == sf::Event::Closed)
+                window.close();
+        }
 
-    std::cout << particles[0].pos.x << std::endl;
-
-    
-    for(int i = 0; i < 100; i++)
         update(particles);
 
-    std::cout << particles[0].pos.x << std::endl;
+        window.clear();
+        
+        // Draw particles as circles
+        for (const auto& p : particles) {
+            sf::CircleShape circle(5.0f);
+            circle.setFillColor(sf::Color::Blue);
+            circle.setPosition(p.pos.x , -p.pos.y); 
+            window.draw(circle);
+        }
 
+        window.display();
+    }
 
     return 0;
 }
