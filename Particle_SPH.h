@@ -17,6 +17,9 @@
 #include "include/Field/BareField.h"
 #include "include/Meshes/CartesianCentering.h"
 
+#ifndef PARTICLE_SPH_H
+#define PARTICLE_SPH_H
+
 
 using namespace ippl;
 using namespace std;
@@ -34,3 +37,5 @@ public:
   }
 
 };
+
+#endif
