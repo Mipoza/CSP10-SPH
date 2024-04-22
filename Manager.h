@@ -28,7 +28,7 @@ using namespace std;
 template<unsigned int Dim, unsigned int N>
 unsigned int getdim(Vector<Vector<double, Dim>,N>)
 {
-    return Dim;
+    return N;
 }
 
 template<unsigned int Dim, unsigned int N>
@@ -37,28 +37,35 @@ public:
     using particle_position_type  = ParticleAttrib<Vector<double, Dim>>;
 
     SPH_Particle<Dim> particles;
+    double dt;
 
-    Manager(ParticleSpatialLayout<double,Dim>& L) : particles(L) {}
+    Manager(ParticleSpatialLayout<double,Dim>& L, double dt_) : dt(dt_), particles(L) {}
 
     void pre_run(Vector<Vector<double, Dim>,N> R_part, Vector<Vector<double, Dim>,N> v_part) 
     {
+        int N_new = getdim(R_part);
+        particles.create(N_new);
+
         typename Manager<Dim, N>::particle_position_type::HostMirror R_host = particles.R.getHostMirror();
         typename Manager<Dim, N>::particle_position_type::HostMirror v_host = particles.vel.getHostMirror();
-        int N_new = getdim(R_part);
-
-        particles.create(N_new);
 
         for (unsigned int i = 0; i < N_new; ++i) {
 
             R_host(i) = R_part[i];
-            v_host(i) = v_host[i];
+            v_host(i) = v_part[i];
 
         }
+        Kokkos::deep_copy(particles.R.getView(), R_host);
+        Kokkos::deep_copy(particles.vel.getView(), v_host);
+
         particles.update();
     }
 
-        void pre_step() 
-        { cout << "pre_step" << endl; }
+        //As a preliminary way we pass the function as an argument of pre_step()
+        void pre_step(Vector<double, Dim> (*func)(Vector<double, Dim>)) 
+        { 
+            particles.acceleration_function_external(func);
+        }
 
        /**
         * @brief A method that should be used after perfoming a step of simulation.
@@ -76,7 +83,28 @@ public:
         *  their time integration method for solving the considered governing equation.
         */
         void advance() 
-        { cout << "advance" << endl; }
+        { 
+            /* --- KDK scheme --- */
+            // v_{i+1/2}
+
+            //vector operators are not working?? Velocity is not changing vectorially
+
+            particles.vel = particles.vel + particles.acceleration*dt/2.;
+            // x_{i + 1}
+            particles.R = particles.R + particles.vel*dt;
+            // Enforce bd conditions
+            //particles.set_bd();
+            // Compute acceleration at new position
+            //particles.smoothen();
+            // v_{i + 1}
+            particles.vel = particles.vel + particles.acceleration*dt/2.;
+
+            // For debugging only
+            // std::cout << "Time-step\n";
+
+            particles.update();
+
+        }
 
        /**
         * @brief The main for loop fro running a simulation.
@@ -87,46 +115,5 @@ public:
         * @param nt The number of time steps to run the simulation.
         */
 };
-
-
-// int main(int argc, char* argv[]) {
-
-// 	initialize(argc, argv);
-//     {   
-//         constexpr unsigned int dim = 3;
-//  	    array<int, dim> points = {256, 256, 256};
-//  		int pt = 25;
-//  		Index I(pt);
-//  		NDIndex<dim> owned(I, I, I);
-//  		array<bool, dim> isParallel;
-//  		isParallel.fill(true);  // Specifies SERIAL, PARALLEL dims
-//  		// all parallel layout, standard domain, normal axis order
-//  		FieldLayout<dim> layout(MPI_COMM_WORLD, owned, isParallel);	
-//  		double dx = 1.0 / 256.0;
-
-//  		Vector<double,dim> hx = {dx, dx, dx};
-//  		Vector<double,dim> origin = {0.0, 0.0, 0.0};
-//  		UniformCartesian<double,dim> mesh(owned, hx, origin);
-
-//  		ParticleSpatialLayout<double,3> myparticlelayout(layout, mesh);
-
-//         Manager<3, 10> manager(myparticlelayout);
-//         Vector<Vector<double, 3>, 10> R_part_0;
-//         Vector<Vector<double, 3>, 10> v_part_0;
-
-//         //Initializing random particle positions and velocities within Manager object
-
-//         for (int i = 0; i < 10; i++) {
-//             double i_double = static_cast<double>(i);
-//             R_part_0[i] = Vector<double, 3>(i_double*2.0, i_double*i_double, -3*i_double);
-//             v_part_0[i] = Vector<double, 3>(i_double*2.6, -i_double*i_double, 8.4*i_double);
-//         }
-
-//         manager.pre_run(R_part_0, v_part_0);
-//     }
-// 	finalize();
-
-// 	return 0;
-// }
 
 
