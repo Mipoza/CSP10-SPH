@@ -1,6 +1,7 @@
 #include "../include/Particle/ParticleBase.h"
 #include "../include/Particle/ParticleAttrib.h"
 #include <cmath>
+#include <forward_list>
 
 /* CubicSplineKernel for smoothening the QOI */
 template<typename T, unsigned DIM>
@@ -38,6 +39,8 @@ struct SPHParticle: public ippl::ParticleBase<ippl::ParticleSpatialLayout<T, DIM
   //       We still need to solve the nearest neighbor problem
   // Helper for nearest neighbors (?)
   ippl::ParticleAttrib<std::size_t> idx;
+  ippl::ParticleAttrib<std::forward_list<std::size_t>> neighbor_list;
+
   // Physical quantities
   ippl::ParticleAttrib<T> mass, density, pressure;
   ippl::ParticleBase<PLayout_t>::particle_position_type 
