@@ -48,7 +48,7 @@ public:
   }
 
 
-  void acceleration_function_external(Vector<double, Dim> (*func)(Vector<double, Dim>))
+  /*void acceleration_function_external(Vector<double, Dim> (*func)(Vector<double, Dim>))
   {
     //Needs to be changed to getTotalNum() when we have the function?
     int N = this->getLocalNum();
@@ -65,7 +65,7 @@ public:
     Kokkos::deep_copy((this->acceleration).getView(), accel_host);
 
     this->update();
-  }
+  }*/
 
 };
 
