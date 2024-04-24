@@ -109,6 +109,7 @@ struct ChainingMeshHelper{
                   << ncells << " cells" << std::endl;
         std::abort();
     }
+    create_neighbor_lists();
   }
 
   // Get the grid index as a "tuple" (here array)

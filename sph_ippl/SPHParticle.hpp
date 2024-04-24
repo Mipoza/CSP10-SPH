@@ -67,8 +67,6 @@ struct SPHParticle: public ippl::ParticleBase<ippl::ParticleSpatialLayout<T, DIM
     // probably isn't that simple tough
     for(std::size_t p_idx = 0; p_idx < N_particles; ++p_idx)
       CMHelper.add_particle(position(p_idx), p_idx);
-    // Find neighbors
-    CMHelper.create_neighbor_lists();
   }
 
   // Find nearest neighbors and smoothen
