@@ -1,7 +1,10 @@
 #include "../include/Particle/ParticleBase.h"
 #include "../include/Particle/ParticleAttrib.h"
+#pragma once
 #include <cmath>
-#include <forward_list>
+#include <iostream>
+
+#include "ChainingMesh.hpp"
 
 /* CubicSplineKernel for smoothening the QOI */
 template<typename T, unsigned DIM>
@@ -22,8 +25,6 @@ struct CubicSplineKernel{
   inline T grad_r(T r, T h);
 }; 
 
-/* --- For convenience, do not use outside of the particle class -- */
-#define getNeighbors(p_idx_) (this->n_idx[p_idx_])
 
 /* Particle class for SPH with nearest neighbor search and 
  * smoothening. */
@@ -35,11 +36,8 @@ struct SPHParticle: public ippl::ParticleBase<ippl::ParticleSpatialLayout<T, DIM
   // The kernel itself
   KERNEL K;
   
-  // TODO: Add a member variable named n_idx or smth
-  //       We still need to solve the nearest neighbor problem
-  // Helper for nearest neighbors (?)
-  ippl::ParticleAttrib<std::size_t> idx;
-  ippl::ParticleAttrib<std::forward_list<std::size_t>> neighbor_list;
+  // Helper for nearest neighbors
+  ChainingMeshHelper<T, DIM> CMHelper;
 
   // Physical quantities
   ippl::ParticleAttrib<T> mass, density, pressure;
@@ -52,8 +50,6 @@ struct SPHParticle: public ippl::ParticleBase<ippl::ParticleSpatialLayout<T, DIM
   }
 
   void registerAttributes(){
-    this->addAttribute(idx);
-
     this->addAttribute(mass);
     this->addAttribute(density);
     this->addAttribute(pressure);
@@ -62,9 +58,17 @@ struct SPHParticle: public ippl::ParticleBase<ippl::ParticleSpatialLayout<T, DIM
     this->addAttribute(accel);
   }
 
-
   void updateNeighbors(){
-    // TODO: solve nearest neighbor problem
+    // Clear ChainingMesh
+    CMHelper.clear();
+    // Only one rank, also getLocalNum is inherited from the base class
+    const std::size_t N_particles = this->getLocalNum();
+    // Maybe TODO: Kokkos_parallel_for or smth along these lines
+    // probably isn't that simple tough
+    for(std::size_t p_idx = 0; p_idx < N_particles; ++p_idx)
+      CMHelper.add_particle(position(p_idx), p_idx);
+    // Find neighbors
+    CMHelper.create_neighbor_lists();
   }
 
   // Find nearest neighbors and smoothen
