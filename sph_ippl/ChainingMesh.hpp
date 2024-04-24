@@ -223,8 +223,6 @@ struct ChainingMeshHelper{
   void clear(){
     for(auto& ll : cell_lists)
       ll.clear();
-    for(auto& ll : neighbor_lists)
-      ll.clear();
   }
 
   // Return an object giving the neighbors of something at
