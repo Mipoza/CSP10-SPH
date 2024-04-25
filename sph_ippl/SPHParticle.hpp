@@ -22,6 +22,7 @@ struct CubicSplineKernel{
     else return 0.;
   }
   // Gradient
+  // TODO: Implement
   inline T grad_r(T r, T h);
 }; 
 
@@ -45,7 +46,9 @@ struct SPHParticle: public ippl::ParticleBase<ippl::ParticleSpatialLayout<T, DIM
     position, velocity, accel;
 
 
-  SPHParticle(PLayout_t& PL, T h_): ippl::ParticleBase<PLayout_t>(PL), kernel_size(h_){
+  template <class VEC>
+  SPHParticle(PLayout_t& PL, VEC& low, VEC& L, T h_): ippl::ParticleBase<PLayout_t>(PL), kernel_size(h_),
+  CMHelper(low, L, h_) {
     registerAttributes();
   }
 
@@ -61,12 +64,8 @@ struct SPHParticle: public ippl::ParticleBase<ippl::ParticleSpatialLayout<T, DIM
   void updateNeighbors(){
     // Clear ChainingMesh
     CMHelper.clear();
-    // Only one rank, also getLocalNum is inherited from the base class
-    const std::size_t N_particles = this->getLocalNum();
-    // Maybe TODO: Kokkos_parallel_for or smth along these lines
-    // probably isn't that simple tough
-    for(std::size_t p_idx = 0; p_idx < N_particles; ++p_idx)
-      CMHelper.add_particle(position(p_idx), p_idx);
+    // Add all particles to the "Hash"
+    CMHelper.add_particles(position);
   }
 
   // Find nearest neighbors and smoothen

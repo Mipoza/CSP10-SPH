@@ -4,6 +4,7 @@
 #include <vector>
 #include <forward_list>
 #include <cmath>
+#include <omp.h>
 
 #define COMPILATION_EVAL(e) (std::integral_constant<decltype(e), e>::value)
 constexpr unsigned powi(int base, unsigned exp){return std::pow(base, exp);}
@@ -81,6 +82,8 @@ struct ChainingMeshHelper{
   std::vector<std::forward_list<std::size_t>> cell_lists;
   // Collection of buckets as neighbors
   std::vector<SizeListCollection<DIM>> neighbor_lists;
+  // For shared parallelism
+  std::vector<omp_lock_t> locks;
   
   ChainingMeshHelper() = default;
 
@@ -100,9 +103,14 @@ struct ChainingMeshHelper{
       // Reserve space for all the buckets
       cell_lists.reserve(ncells);
       neighbor_lists.reserve(ncells);
+      locks.reserve(ncells);
       // We want to access the vector at indices, so resize to ``size'''
       cell_lists.resize(ncells);
       neighbor_lists.resize(ncells);
+      locks.resize(ncells);
+      // Init locks
+      for(omp_lock_t& l : locks)
+        omp_init_lock(&l);
       // std::cout << "Allocated: " << ncells << std::endl;
     } catch(std::bad_alloc){
         std::cerr << "Alloc failed, tried to allocate "
@@ -136,9 +144,30 @@ struct ChainingMeshHelper{
   template <class VEC>
   inline void add_particle(const VEC& pos, const std::size_t& p_idx){
     // "Supercell"-index
-    auto c_idx = cell_idx(pos);
+    const std::size_t key = idx_to_key(cell_idx(pos));
     // Add p_idx to the list in that cell
-    cell_lists[idx_to_key(c_idx)].push_front(p_idx);
+    cell_lists[key].push_front(p_idx);
+  }
+
+  template <class VEC_ARRAY>
+  inline void add_particles(const VEC_ARRAY& pos_arr){
+    // No particles
+    const std::size_t nparticles = pos_arr.size();
+    std::size_t key;
+    auto pos = pos_arr(0);
+    // Loop and add
+
+    #pragma omp parallel for private(key, pos)
+    for(std::size_t p_idx = 0; p_idx < nparticles; ++p_idx){
+      pos = pos_arr(p_idx);
+      key = idx_to_key(cell_idx(pos));
+      // We have to take care that no simultaneous
+      // write to the same list is made, so use locks
+      omp_set_lock(&locks[key]);
+      // Add p_idx to the list in that cell
+      cell_lists[key].push_front(p_idx);
+      omp_unset_lock(&locks[key]);
+    }
   }
 
 
@@ -221,8 +250,9 @@ struct ChainingMeshHelper{
   // The neighbor list is cleared when create_neighbor_lists is called,
   // no need to do it here
   void clear(){
-    for(auto& ll : cell_lists)
-      ll.clear();
+    #pragma omp parallel for
+    for(std::size_t i = 0; i < cell_lists.size(); ++i)
+      cell_lists[i].clear();
   }
 
   // Return an object giving the neighbors of something at
@@ -234,5 +264,12 @@ struct ChainingMeshHelper{
     // std::cout << "IDX: "<< idx << std::endl;
     // Return (const reference)
     return neighbor_lists[idx];
+  }
+
+  // Destroy all the locks, rest goes
+  // out of scope
+  ~ChainingMeshHelper(){
+    for(omp_lock_t& l : locks)
+      omp_destroy_lock(&l);
   }
 };

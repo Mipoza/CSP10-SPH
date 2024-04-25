@@ -18,8 +18,8 @@ int main(int argc, char* argv[]) {
         typedef ippl::ParticleSpatialLayout<double, 2> PLayout_t;
 
         ippl::Vector<int, 2> nr;
-        nr[0] = 10;
-        nr[1] = 10;
+        nr[0] = 8;
+        nr[1] = 8;
 
         Vector_t rmin(0.0);
         Vector_t rmax(1.0);
@@ -43,13 +43,19 @@ int main(int argc, char* argv[]) {
         FieldLayout_t FL(MPI_COMM_WORLD, domain, isParallel, isAllPeriodic);
         PLayout_t PL(FL, mesh);
 
-        p_type P(PL, 0.1);
+        Vector_t L;
+        L[0] = 1;
+        L[1] = 1;
+        double h_ = hr[0];
+        std::shared_ptr<p_type> P;
+        P = std::make_shared<p_type>(PL, rmin, L, h_);
 
-        P.create(10);
+        P->create(10000);
+
         SPHManager<double, 2> M(P, dt);
         M.run(2);
 
-        msg << P.position(1) << endl;
+        msg << P->position(1) << endl;
     }
     ippl::finalize();
  

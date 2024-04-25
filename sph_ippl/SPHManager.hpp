@@ -8,25 +8,26 @@
 template <typename T, unsigned DIM, class KERNEL = CubicSplineKernel<T, DIM>>
 struct SPHManager : public ippl::BaseManager {
   // From ParticleBase
-  SPHParticle<T, DIM, KERNEL> particles;
+  std::shared_ptr<SPHParticle<T, DIM, KERNEL>> particles;
   // Time-step size
   T dt;
   
-  SPHManager(SPHParticle<T, DIM, KERNEL>& P, double dt_): dt(dt_), particles(P) {}
+  SPHManager(std::shared_ptr<SPHParticle<T, DIM, KERNEL>> P,
+      double dt_): dt(dt_), particles(P) {}
 
   // Leap-Frog time-integration
   void advance() override {
     /* --- KDK scheme --- */
     // v_{i+1/2}
-    particles.velocity = particles.velocity + particles.accel*dt/2.;
+    particles->velocity = particles->velocity + particles->accel*dt/2.;
     // x_{i + 1}
-    particles.position = particles.position + particles.velocity*dt;
+    particles->position = particles->position + particles->velocity*dt;
     // Enforce bd conditions
-    particles.set_bd();
+    particles->set_bd();
     // Compute acceleration at new position
-    particles.smoothen();
+    particles->smoothen();
     // v_{i + 1}
-    particles.velocity = particles.velocity + particles.accel*dt/2.;
+    particles->velocity = particles->velocity + particles->accel*dt/2.;
 
     // For debugging only
     // std::cout << "Time-step\n";
