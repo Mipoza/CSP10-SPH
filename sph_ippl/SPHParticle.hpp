@@ -70,23 +70,24 @@ struct SPHParticle: public ippl::ParticleBase<ippl::ParticleSpatialLayout<T, DIM
 
   // Find nearest neighbors and smoothen
   // quantities of interest
-  // Still a TODO
   void smoothen(){
     updateNeighbors();
-    /* Potential form of this function
+    // Potential form of this function
 
-    // OpenMP here?
+    const std::size_t N_particles = position.size();
+    // TODO: Kokkos here?
     for(std::size_t p_idx = 0; p_idx < N_particles; ++p_idx){
-      for(auto neighbor_idx : getNeighbors(p_idx)){
+      auto nn = CMHelper.neighbors(position(p_idx));
+      for(auto p_it = nn.begin(); p_it != nn.end(); ++p_it){
+        const auto& other_pos = position(*p_it);
         T rij; // Distance
-        rij = ...
+        // rij = ...
 
         // TODO: Complete (with viscosity switch etc)
-        accel(p_idx) -= mass(p_idx)*...
+        // accel(p_idx) -= mass(p_idx)*...
       }
     }
 
-    */
   }
 
   void set_bd(){

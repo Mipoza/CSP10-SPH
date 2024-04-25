@@ -28,9 +28,6 @@ struct SPHManager : public ippl::BaseManager {
     particles->smoothen();
     // v_{i + 1}
     particles->velocity = particles->velocity + particles->accel*dt/2.;
-
-    // For debugging only
-    // std::cout << "Time-step\n";
   }
   // pre_step and post_step are no-ops here, not needed
 };
