@@ -111,7 +111,7 @@ struct SPHParticle: public ippl::ParticleBase<ippl::ParticleSpatialLayout<T, DIM
         const auto& other_pos = position(*p_it);
         auto d = (this_pos - other_pos);
 
-        T rij;
+        T rij = 0;
         // TODO: Figure tf out how ippl handles this shit
         for(unsigned i = 0; i < DIM; ++i)
           rij += d[i]*d[i];
