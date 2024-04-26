@@ -23,7 +23,7 @@ struct CubicSplineKernel{
   }
   // Gradient
   // TODO: Implement
-  inline T grad_r(T r, T h);
+  inline T grad_r(T r, T h) {return 1;};
 }; 
 
 
@@ -34,6 +34,10 @@ struct SPHParticle: public ippl::ParticleBase<ippl::ParticleSpatialLayout<T, DIM
   typedef ippl::ParticleSpatialLayout<T, DIM> PLayout_t;
   // Smoothing kernel length
   T kernel_size;
+  T alpha = 1.2,
+    beta  = 2.4,
+    eps = 1e-2,
+    gamm = 1.7;
   // The kernel itself
   KERNEL K;
   
@@ -68,6 +72,28 @@ struct SPHParticle: public ippl::ParticleBase<ippl::ParticleSpatialLayout<T, DIM
     CMHelper.add_particles(position);
   }
 
+  inline T viscositySwitch(const std::size_t& i, const std::size_t& j,
+      const T& rij){
+    T Pij = 0;
+    T dot_product = 0;
+    // TODO: Figure tf out how ippl handles this shit
+    for(unsigned k = 0; k < DIM; ++k)
+      dot_product += (position(i)[k] - position(j)[k])
+                    *(velocity(i)[k] - velocity(j)[k]);
+
+    if(dot_product >= 0)
+      return Pij;
+    // Else continue computation
+    const T rho_ij_bar = (pressure(i) + pressure(j))/2.;
+    const T c_ij_bar = (std::sqrt(gamm*pressure(i)/density(i))
+        + std::sqrt(gamm*pressure(j)/density(j)))/2.;
+
+    const T mu_ij = kernel_size*dot_product/(rij*rij + eps*kernel_size*kernel_size);
+
+    Pij = (-alpha*c_ij_bar*mu_ij + beta*mu_ij*mu_ij)/rho_ij_bar;
+    return Pij;
+  }
+
   // Find nearest neighbors and smoothen
   // quantities of interest
   void smoothen(){
@@ -78,13 +104,29 @@ struct SPHParticle: public ippl::ParticleBase<ippl::ParticleSpatialLayout<T, DIM
     // TODO: Kokkos here?
     for(std::size_t p_idx = 0; p_idx < N_particles; ++p_idx){
       auto nn = CMHelper.neighbors(position(p_idx));
+      const auto& this_pos = position(p_idx);
+      // Term constant for this particle
+      const T p_idx_constant = pressure(p_idx)/(density(p_idx)*density(p_idx));
       for(auto p_it = nn.begin(); p_it != nn.end(); ++p_it){
         const auto& other_pos = position(*p_it);
-        T rij; // Distance
-        // rij = ...
+        auto d = (this_pos - other_pos);
+
+        T rij;
+        // TODO: Figure tf out how ippl handles this shit
+        for(unsigned i = 0; i < DIM; ++i)
+          rij += d[i]*d[i];
+
+        rij = std::sqrt(rij); // Distance
 
         // TODO: Complete (with viscosity switch etc)
-        // accel(p_idx) -= mass(p_idx)*...
+        accel(p_idx) -= 
+          mass(*p_it)*
+          (
+            p_idx_constant 
+            + pressure(*p_it)/(density(*p_it)*density(*p_it))
+            + viscositySwitch(p_idx, *p_it, rij)
+          )
+          *K.grad_r(rij, kernel_size);
       }
     }
 
