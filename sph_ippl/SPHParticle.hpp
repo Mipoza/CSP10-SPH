@@ -76,7 +76,7 @@ struct SPHParticle: public ippl::ParticleBase<ippl::ParticleSpatialLayout<T, DIM
   inline T viscositySwitch(const std::size_t& i, const std::size_t& j,
       const T& rij, const ippl::Vector<T, DIM>& ri, const ippl::Vector<T, DIM>& rj){
     T Pij = 0;
-    // TODO: Figure tf out how ippl handles this shit
+
     ippl::Vector<T, DIM> rij = ri - rj; 
     ippl::Vector<T, DIM> vij = velocity(i) - velocity(j); 
     const T dot_product = rij.dot(vij);
