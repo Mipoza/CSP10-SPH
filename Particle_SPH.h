@@ -45,6 +45,7 @@ public:
     this->addAttribute(density);
     this->addAttribute(pressure);
     this->addAttribute(acceleration);
+    this->addAttribute(Energy_density);
   }
 
 
