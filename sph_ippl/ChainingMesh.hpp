@@ -296,7 +296,9 @@ struct ChainingMeshHelper{
   // Destroy all the locks, rest goes
   // out of scope
   ~ChainingMeshHelper(){
+#ifdef _OPENMP
     for(omp_lock_t& l : locks)
       omp_destroy_lock(&l);
+#endif
   }
 };
