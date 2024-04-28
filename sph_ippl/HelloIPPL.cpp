@@ -50,7 +50,7 @@ int main(int argc, char* argv[]) {
         std::shared_ptr<p_type> P;
         P = std::make_shared<p_type>(PL, rmin, L, h_);
 
-        P->create(10000);
+        P->create(10);
 
         SPHManager<double, 2> M(P, dt);
         M.run(2);

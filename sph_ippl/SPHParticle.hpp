@@ -62,7 +62,6 @@ struct SPHParticle: public ippl::ParticleBase<ippl::ParticleSpatialLayout<T, DIM
     this->addAttribute(pressure);
     this->addAttribute(position);
     this->addAttribute(velocity);
-    this->addAttribute(energy_density);
     this->addAttribute(accel);
   }
 
@@ -76,10 +75,10 @@ struct SPHParticle: public ippl::ParticleBase<ippl::ParticleSpatialLayout<T, DIM
   inline T viscositySwitch(const std::size_t& i, const std::size_t& j,
       const T& rij, const ippl::Vector<T, DIM>& ri, const ippl::Vector<T, DIM>& rj){
     T Pij = 0;
-
-    ippl::Vector<T, DIM> rij = ri - rj; 
-    ippl::Vector<T, DIM> vij = velocity(i) - velocity(j); 
-    const T dot_product = rij.dot(vij);
+    // TODO: Figure tf out how ippl handles this shit
+    ippl::Vector<T, DIM> r_ij = ri - rj; 
+    ippl::Vector<T, DIM> v_ij = velocity(i) - velocity(j); 
+    const T dot_product = r_ij.dot(v_ij);
 
     if(dot_product >= 0)
       return Pij;
@@ -119,7 +118,7 @@ struct SPHParticle: public ippl::ParticleBase<ippl::ParticleSpatialLayout<T, DIM
           (
             p_idx_constant 
             + pressure(*p_it)/(density(*p_it)*density(*p_it))
-            + viscositySwitch(p_idx, *p_it, rij)
+            + viscositySwitch(p_idx, *p_it, rij, this_pos, other_pos)
           )
           *K.grad_r(rij, kernel_size);
       }
