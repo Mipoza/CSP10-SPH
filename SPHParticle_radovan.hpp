@@ -78,10 +78,7 @@ struct SPHParticle: public ippl::ParticleBase<ippl::ParticleSpatialLayout<T, DIM
     // Clear ChainingMesh
     CMHelper.clear();
     // Add all particles to the "Hash"
-    const std::size_t N_particles = position.size();
-    for(std::size_t p_idx = 0; p_idx < N_particles; ++p_idx){
-      CMHelper.add_particle(position(p_idx), p_idx);
-    }
+    CMHelper.add_particles(position);
   }
 
   // inline T viscositySwitch(const std::size_t& i, const std::size_t& j,

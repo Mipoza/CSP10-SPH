@@ -45,7 +45,7 @@ public:
 
     Manager(ParticleSpatialLayout<double,Dim>& L, ippl::Vector<double,Dim>& low, ippl::Vector<double,Dim>& fin, double dt_, double h_) : dt(dt_), h(h_), particles(L, low, fin, h_) {}
 
-    void pre_run(std::vector<Vector<double, Dim>> R_part, std::vector<Vector<double, Dim>> v_part, std::vector<double> E_part, ippl::BC bc) 
+    void pre_run(std::vector<Vector<double, Dim>> R_part, std::vector<Vector<double, Dim>> v_part, std::vector<double> E_part, std::vector<double> m_part, ippl::BC bc) 
     {
         //int N_new = getdim(R_part);
         int N_new = R_part.size();
@@ -53,19 +53,19 @@ public:
 
         typename Manager<Dim, N>::particle_position_type::HostMirror R_host = particles.position.getHostMirror();
         typename Manager<Dim, N>::particle_position_type::HostMirror v_host = particles.velocity.getHostMirror();
-        //typename Manager<Dim, N>::particle_scalar_type::HostMirror E_host = particles.energy_density.getHostMirror();
+        typename Manager<Dim, N>::particle_scalar_type::HostMirror m_host = particles.mass.getHostMirror();
 
         for (unsigned int i = 0; i < N_new; ++i) {
 
             R_host(i) = R_part[i];
             v_host(i) = v_part[i];
-            //E_host(i) = E_part[i];
+            m_host(i) = m_part[i];
 
         }
 
         Kokkos::deep_copy(particles.position.getView(), R_host);
         Kokkos::deep_copy(particles.velocity.getView(), v_host);
-       //Kokkos::deep_copy(particles.energy_density.getView(), E_host);
+        Kokkos::deep_copy(particles.mass.getView(), m_host);
 
         // particles.update();
 
@@ -73,21 +73,25 @@ public:
     }
 
         //As a preliminary way we pass the function as an argument of pre_step()
-        void pre_step()
+    void pre_step()
         { 
             //particles.acceleration_function_external(func);
+            cout << "before_update" << endl;
             particles.updateNeighbors();
+            cout << "after_update" << endl;
             const std::size_t N_particles = particles.position.size();
             // TODO: Kokkos here?
             CubicSplineKernel<double, Dim> W;
             for(std::size_t p_idx = 0; p_idx < N_particles; ++p_idx){
                 auto nn = particles.CMHelper.neighbors(particles.position(p_idx));
                 particles.density(p_idx) = 0.0;
+
                 for(auto p_it = nn.begin(); p_it != nn.end(); ++p_it){
                     const auto& other_pos = particles.position(*p_it);
                     ippl::Vector<double, Dim> d =  other_pos - particles.position(p_idx);
                     double rij = std::sqrt(d.dot(d));
                     particles.density(p_idx) += particles.mass(*p_it)*W(rij, h);
+                    
                 }
                 particles.pressure(p_idx) = pow(particles.density(p_idx), Adiabatic_index);
             }
