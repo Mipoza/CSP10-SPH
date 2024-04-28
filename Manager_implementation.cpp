@@ -4,25 +4,25 @@
 #include <cstdlib>
 #include <ctime>
 
-#include "include/Ippl.h"
+#include "../include/Ippl.h"
 
-#include "include/Expression/IpplExpressions.h" 
+#include "../include/Expression/IpplExpressions.h" 
 //#include "include/Expression/IpplOperators.h" 
 
-#include "include/Types/Vector.h"
-#include "include/Particle/ParticleLayout.h"
-#include "include/Particle/ParticleSpatialLayout.h"
-#include "include/Particle/ParticleBase.h"
-#include "include/Particle/ParticleAttribBase.h"
-#include "include/Particle/ParticleAttrib.h"
-#include "include/FieldLayout/FieldLayout.h"
-#include "include/Field/Field.h"
-#include "include/Field/BareField.h"
-#include "include/Meshes/CartesianCentering.h"
-#include "include/Particle/ParticleBC.h"
+#include "../include/Types/Vector.h"
+#include "../include/Particle/ParticleLayout.h"
+#include "../include/Particle/ParticleSpatialLayout.h"
+#include "../include/Particle/ParticleBase.h"
+#include "../include/Particle/ParticleAttribBase.h"
+#include "../include/Particle/ParticleAttrib.h"
+#include "../include/FieldLayout/FieldLayout.h"
+#include "../include/Field/Field.h"
+#include "../include/Field/BareField.h"
+#include "../include/Meshes/CartesianCentering.h"
+#include "../include/Particle/ParticleBC.h"
 
-#include "include/Manager/BaseManager.h"
-#include "Particle_SPH.h"
+#include "../include/Manager/BaseManager.h"
+#include "SPHParticle_radovan.hpp"
 #include "Manager.h"
 
 #include <SFML/Graphics.hpp>
@@ -51,8 +51,9 @@ Vector<double, 2> Repulsive_radial(Vector<double, 2> position)
 
 
 int main(int argc, char* argv[]) {
-
-	sf::RenderWindow window(sf::VideoMode(800, 600), "SPH Simulation");
+	int width = 800;
+	int height = 600;
+	sf::RenderWindow window(sf::VideoMode(width, height), "SPH Simulation");
 
 	initialize(argc, argv);
 	{
@@ -67,7 +68,7 @@ int main(int argc, char* argv[]) {
  		// all parallel layout, standard domain, normal axis order
  		FieldLayout<dim> layout(MPI_COMM_WORLD, owned, isParallel);	
  		double dx = 1.0 / 8.0;
-		double dt = 0.1;
+		double dt = 0.001;
 
  		Vector<double,dim> hx = {dx, dx};
  		Vector<double,dim> origin = {0.0, 0.0};
@@ -85,10 +86,11 @@ int main(int argc, char* argv[]) {
         // //Initializing random particle positions and velocities within Manager object
 
 
-		for (int i = 0; i < 10000; i++)
-		{	double random_1 = 0.0*rand_minus1_to_1();
-			double random_2 = 0.0*rand_minus1_to_1();
-			R_part_0.push_back(Vector<double, 2>(i*0.0001, 0));
+		for (int i = 0; i < 100; i++)
+		{	double random_1 = 0.46*rand_minus1_to_1();
+			double random_2 = 0.46*rand_minus1_to_1();
+
+			R_part_0.push_back(Vector<double, 2>(i*0.01, 0.2));
 			v_part_0.push_back(Vector<double, 2>(random_1, random_2));
 			m_part_0.push_back(1.0);
 			E_part_0.push_back(0.0);
@@ -96,27 +98,46 @@ int main(int argc, char* argv[]) {
 
         manager.pre_run(R_part_0, v_part_0, E_part_0, m_part_0 ,ippl::BC::PERIODIC);
 
-		const unsigned int N_times = 5;
+		const unsigned int N_times = 100;
 
 		//integration loop of the time eovlution
-
+		
 		for (int i = 0; i < N_times; i++)
 		{
-			for (const auto& p : particles.positions ) {
-				sf::CircleShape circle(4.0f);   
+			window.clear();
 
-				//float t = (p.rho - minRho) / (maxRho - minRho);
-				//sf::Color color(static_cast<sf::Uint8>(255 * t), 0, static_cast<sf::Uint8>(255 * (1-t)));
-				sf::Color color(255,0,0);
-				circle.setFillColor(color);
+			float minRho = manager.particles.density(0);
+			float maxRho = manager.particles.density(0);
+
+			for(int k = 0; k < manager.particles.density.size(); k++){
+				if(minRho > manager.particles.density(k))
+					minRho = manager.particles.density(k);
+				if(maxRho < manager.particles.density(k))
+					maxRho = manager.particles.density(k);
+			}
+
+
+			auto pos = manager.particles.position;
+			for (int j = 0; j < pos.size(); j++) {
+				sf::CircleShape circle(8.0f);   
+
 				
-				circle.setPosition(p[0],p[1]); 
+
+				float t = (manager.particles.density(j) - minRho) / (maxRho - minRho);
+				cout << manager.particles.velocity(j) << endl;
+				//sf::Color color(static_cast<sf::Uint8>(255 * t), 0, static_cast<sf::Uint8>(255 * (1-t)));
+				sf::Color color(0,0,255);
+				circle.setFillColor(color);
+
+				circle.setPosition(pos(j)[0]*width,pos(j)[1]*height); 
 				window.draw(circle);
         	}
 
 			manager.pre_step();
 			manager.advance();
 			
+			window.display();
+
 		}
 		//manager.advance();
 			// cout << "density " << manager.particles.density(3) << endl;

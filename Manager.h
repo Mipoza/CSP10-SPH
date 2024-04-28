@@ -2,24 +2,24 @@
 #include <iostream>
 #include <cmath>
 
-#include "include/Ippl.h"
+#include "../include/Ippl.h"
 
-#include "include/Expression/IpplExpressions.h" 
+#include "../include/Expression/IpplExpressions.h" 
 //#include "include/Expression/IpplOperators.h" 
 
-#include "include/Types/Vector.h"
-#include "include/Particle/ParticleLayout.h"
-#include "include/Particle/ParticleSpatialLayout.h"
-#include "include/Particle/ParticleBase.h"
-#include "include/Particle/ParticleAttribBase.h"
-#include "include/Particle/ParticleAttrib.h"
-#include "include/FieldLayout/FieldLayout.h"
-#include "include/Field/Field.h"
-#include "include/Field/BareField.h"
-#include "include/Meshes/CartesianCentering.h"
-#include "include/Particle/ParticleBC.h"
+#include "../include/Types/Vector.h"
+#include "../include/Particle/ParticleLayout.h"
+#include "../include/Particle/ParticleSpatialLayout.h"
+#include "../include/Particle/ParticleBase.h"
+#include "../include/Particle/ParticleAttribBase.h"
+#include "../include/Particle/ParticleAttrib.h"
+#include "../include/FieldLayout/FieldLayout.h"
+#include "../include/Field/Field.h"
+#include "../include/Field/BareField.h"
+#include "../include/Meshes/CartesianCentering.h"
+#include "../include/Particle/ParticleBC.h"
 
-#include "include/Manager/BaseManager.h"
+#include "../include/Manager/BaseManager.h"
 #include "SPHParticle_radovan.hpp"
 
 
@@ -42,6 +42,8 @@ public:
     double dt;
     double Adiabatic_index;
     double h;
+    ippl::BC bc;
+
 
     Manager(ParticleSpatialLayout<double,Dim>& L, ippl::Vector<double,Dim>& low, ippl::Vector<double,Dim>& fin, double dt_, double h_) : dt(dt_), h(h_), particles(L, low, fin, h_) {}
 
@@ -71,15 +73,16 @@ public:
         // particles.update();
 
         particles.setParticleBC(bc);
+        this->bc = bc;
     }
 
         //As a preliminary way we pass the function as an argument of pre_step()
     void pre_step()
         { 
             //particles.acceleration_function_external(func);
-            cout << "before_update" << endl;
+            //cout << "before_update" << endl;
             particles.updateNeighbors();
-            cout << "after_update" << endl;
+            //cout << "after_update" << endl;
             const std::size_t N_particles = particles.position.size();
             // TODO: Kokkos here?
             CubicSplineKernel<double, Dim> W;
@@ -95,18 +98,20 @@ public:
                     
                 }
                 particles.pressure(p_idx) = pow(particles.density(p_idx), Adiabatic_index);
-                cout << "density: " << particles.density(p_idx) << endl;
+                //cout << "density: " << particles.density(p_idx) << endl;
             }
 
             for(std::size_t p_idx = 0; p_idx < N_particles; ++p_idx){
                 auto nn = particles.CMHelper.neighbors(particles.position(p_idx));
                 particles.accel(p_idx) = 0.0;
                 for(auto p_it = nn.begin(); p_it != nn.end(); ++p_it){
-                    const auto& other_pos = particles.position(*p_it);
-                    ippl::Vector<double, Dim> d =  other_pos - particles.position(p_idx);
-                    double rij = std::sqrt(d.dot(d));
-                    double aux = ((particles.pressure(*p_it)/pow(particles.density(*p_it),2))-((particles.pressure(p_idx)/pow(particles.density(p_idx),2))));
-                    particles.accel(p_idx) += (-((d)*W.grad_r(rij, h))/rij)*(particles.mass(*p_it))*aux;
+                    if(p_idx != *p_it){
+                        const auto& other_pos = particles.position(*p_it);
+                        ippl::Vector<double, Dim> d =  other_pos - particles.position(p_idx);
+                        double rij = std::sqrt(d.dot(d));
+                        double aux = ((particles.pressure(*p_it)/pow(particles.density(*p_it),2))-((particles.pressure(p_idx)/pow(particles.density(p_idx),2))));
+                        particles.accel(p_idx) += (-((d)*W.grad_r(rij, h))/rij)*(particles.mass(*p_it))*aux;
+                    }
                 }
             }
             //std::vector<SizeListCollection<Dim>> vector_NN = particles.CMHelper.neighbor_lists;
@@ -144,9 +149,9 @@ public:
 
             particles.velocity = particles.velocity + particles.accel*dt/2.;
             // x_{i + 1}
-            particles.R = particles.R + particles.velocity*dt;
+            particles.position = particles.position + particles.velocity*dt;
             // Enforce bd conditions
-            //particles.set_bd();
+            particles.setParticleBC(bc);
             // Compute acceleration at new position
             //particles.smoothen();
             // v_{i + 1}

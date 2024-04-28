@@ -1,5 +1,5 @@
-#include "include/Particle/ParticleBase.h"
-#include "include/Particle/ParticleAttrib.h"
+#include "../include/Particle/ParticleBase.h"
+#include "../include/Particle/ParticleAttrib.h"
 #pragma once
 #include <cmath>
 #include <iostream>
@@ -7,7 +7,7 @@
 #include "ChainingMesh.hpp"
 
 /* CubicSplineKernel for smoothening the QOI */
-template<typename T, unsigned DIM>
+/*template<typename T, unsigned DIM>
 struct CubicSplineKernel{
   CubicSplineKernel() = default;
   // Evaluation
@@ -32,7 +32,40 @@ struct CubicSplineKernel{
       return -(16.)*std::pow(1. - q, 2);
     else return 0.;
   }
-}; 
+};*/
+
+template<typename T, unsigned DIM>
+struct CubicSplineKernel{
+    CubicSplineKernel() = default;
+
+    // Evaluation
+    // Modified to match the normalization of the provided W function
+    inline T operator()(T r, T h) {
+        const T q = std::abs(r) / h;
+        const T sigma = static_cast<T>(10.0 / (7 * M_PI * std::pow(h, 2))); // normalization constant for dim 2
+
+        if (q >= 0 && q <= 1)
+            return sigma * (1 - 1.5 * std::pow(q, 2) * (1 - q / 2));
+        else if (q > 1 && q <= 2)
+            return (sigma / 4) * std::pow((2 - q), 3);
+        else
+            return static_cast<T>(0);
+    }
+
+    // Gradient
+    // Adapted for gradient calculation
+    inline T grad_r(T r, T h) {
+        const T q = std::abs(r) / h;
+        const T sigma = static_cast<T>(10.0 / (7 * M_PI * std::pow(h, 2))); // normalization constant for dim 2
+
+        if (q >= 0 && q <= 1)
+            return sigma * (3/4) * q*(3*q-4)*(1/h);
+        else if (q > 1 && q <= 2)
+            return -(sigma / 4) * 3 * std::pow((2 - q), 2) * (1/h);
+        else
+            return static_cast<T>(0);
+    }
+};
 
 
 /* Particle class for SPH with nearest neighbor search and 
