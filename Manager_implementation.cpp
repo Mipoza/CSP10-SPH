@@ -25,6 +25,7 @@
 #include "Particle_SPH.h"
 #include "Manager.h"
 
+#include <SFML/Graphics.hpp>
 
 using namespace ippl;
 using namespace std;
@@ -50,6 +51,8 @@ Vector<double, 2> Repulsive_radial(Vector<double, 2> position)
 
 
 int main(int argc, char* argv[]) {
+
+	sf::RenderWindow window(sf::VideoMode(800, 600), "SPH Simulation");
 
 	initialize(argc, argv);
 	{
@@ -96,7 +99,25 @@ int main(int argc, char* argv[]) {
 		const unsigned int N_times = 5;
 
 		//integration loop of the time eovlution
-		manager.pre_step();
+
+		for (int i = 0; i < N_times; i++)
+		{
+			for (const auto& p : particles.positions ) {
+				sf::CircleShape circle(4.0f);   
+
+				//float t = (p.rho - minRho) / (maxRho - minRho);
+				//sf::Color color(static_cast<sf::Uint8>(255 * t), 0, static_cast<sf::Uint8>(255 * (1-t)));
+				sf::Color color(255,0,0);
+				circle.setFillColor(color);
+				
+				circle.setPosition(p[0],p[1]); 
+				window.draw(circle);
+        	}
+
+			manager.pre_step();
+			manager.advance();
+			
+		}
 		//manager.advance();
 			// cout << "density " << manager.particles.density(3) << endl;
 			// cout << "mass " << manager.particles.mass(3) << endl;
