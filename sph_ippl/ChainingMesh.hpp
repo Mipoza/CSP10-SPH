@@ -98,8 +98,10 @@ struct ChainingMeshHelper{
   std::vector<std::forward_list<std::size_t>> cell_lists;
   // Collection of buckets as neighbors
   std::vector<SizeListCollection<DIM>> neighbor_lists;
+#ifdef _OPENMP
   // For shared parallelism
   std::vector<omp_lock_t> locks;
+#endif
   
   ChainingMeshHelper() = default;
 
@@ -119,14 +121,18 @@ struct ChainingMeshHelper{
       // Reserve space for all the buckets
       cell_lists.reserve(ncells);
       neighbor_lists.reserve(ncells);
+#ifdef _OPENMP
       locks.reserve(ncells);
+#endif
       // We want to access the vector at indices, so resize to ``size'''
       cell_lists.resize(ncells);
       neighbor_lists.resize(ncells);
+#ifdef _OPENMP
       locks.resize(ncells);
       // Init locks
       for(omp_lock_t& l : locks)
         omp_init_lock(&l);
+#endif
       // std::cout << "Allocated: " << ncells << std::endl;
     } catch(std::bad_alloc){
         std::cerr << "Alloc failed, tried to allocate "
@@ -172,17 +178,22 @@ struct ChainingMeshHelper{
     std::size_t key;
     auto pos = pos_arr(0);
     // Loop and add
-
+#ifdef _OPENMP
     #pragma omp parallel for private(key, pos)
+#endif
     for(std::size_t p_idx = 0; p_idx < nparticles; ++p_idx){
       pos = pos_arr(p_idx);
       key = idx_to_key(cell_idx(pos));
       // We have to take care that no simultaneous
       // write to the same list is made, so use locks
+#ifdef _OPENMP
       omp_set_lock(&locks[key]);
+#endif 
       // Add p_idx to the list in that cell
       cell_lists[key].push_front(p_idx);
+#ifdef _OPENMP
       omp_unset_lock(&locks[key]);
+#endif
     }
   }
 
