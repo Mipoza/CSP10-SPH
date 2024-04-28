@@ -1,6 +1,7 @@
 #pragma once
 #include <array>
 #include <iostream>
+#include <utility>
 #include <vector>
 #include <forward_list>
 #include <cmath>
@@ -20,7 +21,7 @@ struct SizeListCollection{
   }
 
   void add_list(std::forward_list<std::size_t>* ptr){
-    // Add to list
+    // Add to list, unless ptr is empty
     ll_ptrs.push_back(ptr);
   }
 
@@ -30,15 +31,19 @@ struct SizeListCollection{
     ll_ptrs.clear();
   }
 
+  /* Iterator for iterating through the neighbors */
   struct Iterator{
-    unsigned idx_ = 0;
+    char idx_ = 0;
     std::forward_list<std::size_t>::iterator it_;
     SizeListCollection<DIM>* ptr_;
 
     Iterator(SizeListCollection<DIM>* ptr,
         std::forward_list<std::size_t>::iterator it, unsigned idx): 
-      ptr_(ptr), it_(it), idx_(idx) {
-      }
+      ptr_(ptr), it_(it), idx_(idx){
+
+    }
+
+    Iterator(){}
 
     std::size_t& operator*() {
       return *it_;
@@ -58,11 +63,22 @@ struct SizeListCollection{
       return (a.it_ != b.it_);
     }
   };
+  /* End Iterator */
 
   // Basic begin, end functions
 
   Iterator begin(){
-    return Iterator(this, ll_ptrs.front()->begin(), 0);
+    // Might be that the first list is empty
+    char idx = 0;
+    // Walk until we find a non-empty one
+    while(ll_ptrs[idx]->empty() && idx < ll_ptrs.size())
+      ++idx;
+    // std::cout << (idx == ll_ptrs.size()) << std::endl;
+    // Only empty stuff?
+    if(idx == ll_ptrs.size())
+      return Iterator(this, ll_ptrs.back()->end(), ll_ptrs.size() - 1);
+    else
+      return Iterator(this, ll_ptrs[idx]->begin(), 0);
   }
   Iterator end(){
     return Iterator(this, ll_ptrs.back()->end(), ll_ptrs.size() - 1);
