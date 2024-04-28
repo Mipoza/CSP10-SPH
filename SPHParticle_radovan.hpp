@@ -50,7 +50,7 @@ struct SPHParticle: public ippl::ParticleBase<ippl::ParticleSpatialLayout<T, DIM
   KERNEL K;
   
   // Helper for nearest neighbors
-  ChainingMeshHelper<T, DIM> CMHelper;
+  ChainingMeshHelper<T, DIM, true> CMHelper;
 
   // Physical quantities
   ippl::ParticleAttrib<T> mass, density, pressure;

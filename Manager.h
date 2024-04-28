@@ -49,6 +49,7 @@ public:
     {
         //int N_new = getdim(R_part);
         int N_new = R_part.size();
+        cout << "N_new: " << N_new << endl;
         particles.create(N_new);
 
         typename Manager<Dim, N>::particle_position_type::HostMirror R_host = particles.position.getHostMirror();
@@ -69,7 +70,7 @@ public:
 
         // particles.update();
 
-        //particles.setParticleBC(bc);
+        particles.setParticleBC(bc);
     }
 
         //As a preliminary way we pass the function as an argument of pre_step()
@@ -94,6 +95,7 @@ public:
                     
                 }
                 particles.pressure(p_idx) = pow(particles.density(p_idx), Adiabatic_index);
+                cout << "density: " << particles.density(p_idx) << endl;
             }
 
             for(std::size_t p_idx = 0; p_idx < N_particles; ++p_idx){

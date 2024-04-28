@@ -73,7 +73,7 @@ int main(int argc, char* argv[]) {
 
  		ParticleSpatialLayout<double,2> myparticlelayout(layout, mesh);
 
-        Manager<2, 2> manager(myparticlelayout, origin, fin, dt, 1.5);
+        Manager<2, 2> manager(myparticlelayout, origin, fin, dt, 0.001);
         std::vector<Vector<double, 2>> R_part_0;
         std::vector<Vector<double, 2>> v_part_0;
 		std::vector<double> m_part_0;
@@ -82,28 +82,25 @@ int main(int argc, char* argv[]) {
         // //Initializing random particle positions and velocities within Manager object
 
 
-		for (int i = 0; i < 100; i++)
+		for (int i = 0; i < 10000; i++)
 		{	double random_1 = 0.0*rand_minus1_to_1();
 			double random_2 = 0.0*rand_minus1_to_1();
-			R_part_0.push_back(Vector<double, 2>(i*0.1, 0));
+			R_part_0.push_back(Vector<double, 2>(i*0.0001, 0));
 			v_part_0.push_back(Vector<double, 2>(random_1, random_2));
 			m_part_0.push_back(1.0);
 			E_part_0.push_back(0.0);
 		}
 
-        manager.pre_run(R_part_0, v_part_0, E_part_0, m_part_0 ,ippl::BC::REFLECTIVE);
+        manager.pre_run(R_part_0, v_part_0, E_part_0, m_part_0 ,ippl::BC::PERIODIC);
 
 		const unsigned int N_times = 5;
 
 		//integration loop of the time eovlution
-
-		for (int i = 0; i < N_times; i++)
-		{
-			manager.pre_step();
-			manager.advance();
+		manager.pre_step();
+		//manager.advance();
 			// cout << "density " << manager.particles.density(3) << endl;
 			// cout << "mass " << manager.particles.mass(3) << endl;
-		}
+
 
 
     }
