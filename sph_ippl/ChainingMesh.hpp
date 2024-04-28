@@ -78,7 +78,7 @@ struct SizeListCollection{
     if(idx == ll_ptrs.size())
       return Iterator(this, ll_ptrs.back()->end(), ll_ptrs.size() - 1);
     else
-      return Iterator(this, ll_ptrs[idx]->begin(), 0);
+      return Iterator(this, ll_ptrs[idx]->begin(), idx);
   }
   Iterator end(){
     return Iterator(this, ll_ptrs.back()->end(), ll_ptrs.size() - 1);
