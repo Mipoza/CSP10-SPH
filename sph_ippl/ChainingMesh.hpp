@@ -25,12 +25,6 @@ struct SizeListCollection{
     ll_ptrs.push_back(ptr);
   }
 
-  // Reset the list, does not change the capacity
-  // of ll_ptrs, only clears its contents
-  void clear(){
-    ll_ptrs.clear();
-  }
-
   /* Iterator for iterating through the neighbors */
   struct Iterator{
     char idx_ = 0;
@@ -38,7 +32,7 @@ struct SizeListCollection{
     SizeListCollection<DIM>* ptr_;
 
     Iterator(SizeListCollection<DIM>* ptr,
-        std::forward_list<std::size_t>::iterator it, unsigned idx): 
+        std::forward_list<std::size_t>::iterator it, char idx): 
       ptr_(ptr), it_(it), idx_(idx){
 
     }
@@ -52,8 +46,15 @@ struct SizeListCollection{
     Iterator& operator++(){
       ++it_;
       // Jump to next list?
-      if(it_ == (ptr_->ll_ptrs[idx_]->end()) && (idx_ + 1 < ptr_->ll_ptrs.size())){
+      if((it_ == (ptr_->ll_ptrs[idx_]->end())) &&
+         (idx_ + 1 < ptr_->ll_ptrs.size())){
+        // Next list, need to check if it's empty
         ++idx_;
+        // Increment until next non-empty list is reached
+        while(ptr_->ll_ptrs[idx_]->empty() && 
+              idx_ < ptr_->ll_ptrs.size())
+          ++idx_;
+        // Update, worst case it's an empty list and begin == end
         it_ = ptr_->ll_ptrs[idx_]->begin();
       }
       return *this;
@@ -68,12 +69,12 @@ struct SizeListCollection{
   // Basic begin, end functions
 
   Iterator begin(){
-    // Might be that the first list is empty
+    // Might be that the first list is empty, we need to check
     char idx = 0;
     // Walk until we find a non-empty one
-    while(ll_ptrs[idx]->empty() && idx < ll_ptrs.size())
+    while(ll_ptrs[idx]->empty() &&
+          idx < ll_ptrs.size())
       ++idx;
-    // std::cout << (idx == ll_ptrs.size()) << std::endl;
     // Only empty stuff?
     if(idx == ll_ptrs.size())
       return Iterator(this, ll_ptrs.back()->end(), ll_ptrs.size() - 1);
