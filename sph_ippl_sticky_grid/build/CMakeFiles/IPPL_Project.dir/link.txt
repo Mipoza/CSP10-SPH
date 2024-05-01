@@ -1,0 +1,1 @@
+/usr/bin/c++  -fopenmp -g -rdynamic CMakeFiles/IPPL_Project.dir/Manager_implementation.cpp.o -o IPPL_Project  -lMPI::MPI_CXX -lippl -lsfml-system -lsfml-window -lsfml-graphics -lsfml-network -lsfml-audio -lgomp -Wl,-Bstatic -lpthread -Wl,-Bdynamic
