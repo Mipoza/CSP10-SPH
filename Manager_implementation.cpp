@@ -4,22 +4,22 @@
 #include <cstdlib>
 #include <ctime>
 
-#include "../include/Ippl.h"
+#include "include/Ippl.h"
 
-#include "../include/Expression/IpplExpressions.h" 
+#include "include/Expression/IpplExpressions.h" 
 //#include "include/Expression/IpplOperators.h" 
 
-#include "../include/Types/Vector.h"
-#include "../include/Particle/ParticleLayout.h"
-#include "../include/Particle/ParticleSpatialLayout.h"
-#include "../include/Particle/ParticleBase.h"
-#include "../include/Particle/ParticleAttribBase.h"
-#include "../include/Particle/ParticleAttrib.h"
-#include "../include/FieldLayout/FieldLayout.h"
-#include "../include/Field/Field.h"
-#include "../include/Field/BareField.h"
-#include "../include/Meshes/CartesianCentering.h"
-#include "../include/Particle/ParticleBC.h"
+#include "include/Types/Vector.h"
+#include "include/Particle/ParticleLayout.h"
+#include "include/Particle/ParticleSpatialLayout.h"
+#include "include/Particle/ParticleBase.h"
+#include "include/Particle/ParticleAttribBase.h"
+#include "include/Particle/ParticleAttrib.h"
+#include "include/FieldLayout/FieldLayout.h"
+#include "include/Field/Field.h"
+#include "include/Field/BareField.h"
+#include "include/Meshes/CartesianCentering.h"
+#include "include/Particle/ParticleBC.h"
 
 #include "include/Manager/BaseManager.h"
 #include "Particle_SPH.h"
@@ -41,13 +41,6 @@ double rand_minus1_to_1() {
     return random;
 }
 
-Vector<double, 2> Repulsive_radial(Vector<double, 2> position) 
-{
-	double r = sqrt(position[0]*position[0] + position[1]*position[1]);
-	double force = (r*r);
-	return force * position;
-}
-
 
 int main(int argc, char* argv[]) {
 
@@ -64,7 +57,7 @@ int main(int argc, char* argv[]) {
  		// all parallel layout, standard domain, normal axis order
  		FieldLayout<dim> layout(MPI_COMM_WORLD, owned, isParallel);	
  		double dx = 1.0 / 8.0;
-		double dt = 0.001;
+		double dt = 0.1;
 
  		Vector<double,dim> hx = {dx, dx};
  		Vector<double,dim> origin = {0.0, 0.0};
@@ -100,21 +93,19 @@ int main(int argc, char* argv[]) {
 		array<ippl::BC,4> bcs = {ippl::BC::PERIODIC, ippl::BC::PERIODIC, ippl::BC::PERIODIC, ippl::BC::PERIODIC};
 
         manager.pre_run(R_part_0, v_part_0, E_part_0, m_part_0 , bcs);
-
 		manager.pre_step(true);
 
-		cout << "density " << manager.particles.density(200) << endl;
 
 		const unsigned int N_times = 50;
-
 		//integration loop of the time eovlution
 
 		for (unsigned int i = 0; i < N_times; i++)
 		{
-			manager.pre_step();
+			manager.pre_step(true);
 			manager.advance();
 
 			cout << "energy_denisity " << manager.particles.energy_density(200) << endl;
+			cout << "density " << manager.particles.density(200) << endl;
 		}
 
 
