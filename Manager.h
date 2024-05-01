@@ -161,12 +161,12 @@ public:
 
                         else 
                         {
+                            double aux_1 = (((particles.pressure(p_idx)/pow(particles.density(p_idx) + eps,2))));
+                            particles.d_energy_density(p_idx) += (aux_1*particles.mass(*p_it)*vel.dot((-(d)*W.grad_r(rij, h))/(rij + eps)));
                             double aux = ((particles.pressure(*p_it)/pow(particles.density(*p_it) + eps,2))
                                 -((particles.pressure(p_idx)/pow(particles.density(p_idx) + eps,2))));
                             particles.accel(p_idx) += (-((d)*W.grad_r(rij, h))/(rij + eps))*(particles.mass(*p_it))*aux;
                         }
-
-
                     }
                 }
             }

@@ -84,17 +84,17 @@ int main(int argc, char* argv[]) {
 		for (int j = 0; j < 5'000; j++){
 			double r1 = (rand_minus1_to_1() + 1)/2;
 			double r2 = (rand_minus1_to_1() + 1)/2;
-			double random_1 = 0.46*rand_minus1_to_1();
-			double random_2 = 0.46*rand_minus1_to_1();
+			double random_1 = 0;//0.46*rand_minus1_to_1();
+			double random_2 = 0;//0.46*rand_minus1_to_1();
 			R_part_0.push_back(Vector<double, 2>(r1, r2));
 			v_part_0.push_back(Vector<double, 2>(random_1, random_2));
-			m_part_0.push_back(1.0);
+			m_part_0.push_back(0.1);
 			E_part_0.push_back(1.0);
 		}
 
 		array<ippl::BC,4> bcs = {ippl::BC::PERIODIC, ippl::BC::PERIODIC, ippl::BC::PERIODIC, ippl::BC::PERIODIC};
 
-    const bool visc = true;
+    const bool visc = false;
     manager.pre_run(R_part_0, v_part_0, E_part_0, m_part_0 , bcs);
 		manager.pre_step(visc);
 
@@ -133,7 +133,7 @@ int main(int argc, char* argv[]) {
 			manager.advance();
 			window.display();
 
-			cout << "energy_denisity " << manager.particles.energy_density(200) << endl;
+			cout << "energy_density " << manager.particles.energy_density(200) << endl;
 			cout << "density " << manager.particles.density(200) << endl;
 		}
 
