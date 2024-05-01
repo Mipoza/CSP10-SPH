@@ -16,16 +16,23 @@ project(IPPL_Project)
 # Set the source files for your project
 set(SOURCES Manager_implementation.cpp)
 
+
+# Set the path to MPI
+set(MPI_PATH "/opt/homebrew/Cellar/open-mpi/5.0.3/include")  # Replace with your actual MPI path
+
+# Add the include directory for MPI
+include_directories(${MPI_PATH})
+
 # Find MPI package
-find_package(MPI REQUIRED)
+#find_package(MPI REQUIRED)
 
 # Set the directory containing Kokkos_Core.hpp
-set(KOKKOS_INCLUDE_DIR "/cluster/home/atamargo/repeat_ippl_2/Kokkos/Kokkos_serial/include")
+set(KOKKOS_INCLUDE_DIR "/Users/andrestamargo/Desktop/SPH_repository/CSP10-SPH/IPPL_files/kokkos/Kokkos_serial/include")
 
-file(GLOB KOKKOS_LIBRARIES "/cluster/home/atamargo/repeat_ippl_2/Kokkos/Kokkos_serial/lib64/*.a")
+file(GLOB KOKKOS_LIBRARIES "/Users/andrestamargo/Desktop/SPH_repository/CSP10-SPH/IPPL_files/kokkos/Kokkos_serial/lib/*.a")
 
 # Set the directory containing IPPL libraries
-set(IPPL_LIBRARY_DIR "/cluster/home/atamargo/ippl_Multi_build/lib/libippl.a")
+set(IPPL_LIBRARY_DIR "/Users/andrestamargo/Desktop/SPH_repository/CSP10-SPH/IPPL_files/lib/libippl.a")
 
 # Add the directory containing Kokkos_Core.hpp to the include path
 include_directories(${KOKKOS_INCLUDE_DIR})

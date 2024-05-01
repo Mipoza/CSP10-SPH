@@ -23,9 +23,8 @@
 
 #include "include/Manager/BaseManager.h"
 #include "Particle_SPH.h"
-#include "Manager.h"
+#include "Manager_new.h"
 
-#include <SFML/Graphics.hpp>
 
 using namespace ippl;
 using namespace std;
@@ -52,8 +51,6 @@ Vector<double, 2> Repulsive_radial(Vector<double, 2> position)
 
 int main(int argc, char* argv[]) {
 
-	sf::RenderWindow window(sf::VideoMode(800, 600), "SPH Simulation");
-
 	initialize(argc, argv);
 	{
 
@@ -76,7 +73,9 @@ int main(int argc, char* argv[]) {
 
  		ParticleSpatialLayout<double,2> myparticlelayout(layout, mesh);
 
-        Manager<2, 2> manager(myparticlelayout, origin, fin, dt, 0.001);
+		double h = 0.01;
+
+        Manager<2, 2> manager(myparticlelayout, origin, fin, dt, h, 1.4);
         std::vector<Vector<double, 2>> R_part_0;
         std::vector<Vector<double, 2>> v_part_0;
 		std::vector<double> m_part_0;
@@ -85,42 +84,38 @@ int main(int argc, char* argv[]) {
         // //Initializing random particle positions and velocities within Manager object
 
 
-		for (int i = 0; i < 10000; i++)
-		{	double random_1 = 0.0*rand_minus1_to_1();
-			double random_2 = 0.0*rand_minus1_to_1();
-			R_part_0.push_back(Vector<double, 2>(i*0.0001, 0));
-			v_part_0.push_back(Vector<double, 2>(random_1, random_2));
-			m_part_0.push_back(1.0);
-			E_part_0.push_back(0.0);
+		for (int i = 0; i < 10; i++)
+		{	
+			for (int j = 0; j < 100; j++)
+			{
+				double random_1 = 46.0*rand_minus1_to_1();
+				double random_2 = 46.0*rand_minus1_to_1();
+				R_part_0.push_back(Vector<double, 2>(i*0.01*h, j*0.01*h));
+				v_part_0.push_back(Vector<double, 2>(random_1, random_2));
+				m_part_0.push_back(1.0);
+				E_part_0.push_back(0.0);
+			}
 		}
 
-        manager.pre_run(R_part_0, v_part_0, E_part_0, m_part_0 ,ippl::BC::PERIODIC);
+		array<ippl::BC,4> bcs = {ippl::BC::PERIODIC, ippl::BC::PERIODIC, ippl::BC::PERIODIC, ippl::BC::PERIODIC};
 
-		const unsigned int N_times = 5;
+        manager.pre_run(R_part_0, v_part_0, E_part_0, m_part_0 , bcs);
+
+		manager.pre_step(true);
+
+		cout << "density " << manager.particles.density(200) << endl;
+
+		const unsigned int N_times = 50;
 
 		//integration loop of the time eovlution
 
-		for (int i = 0; i < N_times; i++)
+		for (unsigned int i = 0; i < N_times; i++)
 		{
-			for (const auto& p : particles.positions ) {
-				sf::CircleShape circle(4.0f);   
-
-				//float t = (p.rho - minRho) / (maxRho - minRho);
-				//sf::Color color(static_cast<sf::Uint8>(255 * t), 0, static_cast<sf::Uint8>(255 * (1-t)));
-				sf::Color color(255,0,0);
-				circle.setFillColor(color);
-				
-				circle.setPosition(p[0],p[1]); 
-				window.draw(circle);
-        	}
-
 			manager.pre_step();
 			manager.advance();
-			
+
+			cout << "energy_denisity " << manager.particles.energy_density(200) << endl;
 		}
-		//manager.advance();
-			// cout << "density " << manager.particles.density(3) << endl;
-			// cout << "mass " << manager.particles.mass(3) << endl;
 
 
 

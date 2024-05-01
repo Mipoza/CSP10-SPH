@@ -26,6 +26,29 @@
 using namespace ippl;
 using namespace std;
 
+#define eps 1e-4
+
+
+template <unsigned int dim>
+struct viscosity_factor{
+  double alpha, beta;
+
+  viscosity_factor(double alpha_, double beta_): alpha(alpha_), beta(beta_){}
+
+    inline double operator()(double c, double density, Vector<double, dim> dis, Vector<double, dim> vel, double h) {
+
+        double rij = std::sqrt(dis.dot(dis));
+        double dot_product = dis.dot(vel);
+        double mu = h*dot_product/(std::pow(rij,2) + eps*pow(h,2));
+
+        
+        if (dot_product < 0) {return (-(alpha * c * mu) + (beta * mu * mu)) / (density + eps);} 
+        else {return 0;}
+    }
+
+
+};
+
 template<unsigned int Dim, unsigned int N>
 unsigned int getdim(Vector<Vector<double, Dim>,N>)
 {
@@ -42,44 +65,49 @@ public:
     double dt;
     double Adiabatic_index;
     double h;
+    std::array<ippl::BC,2*Dim>  bcs;
 
-    Manager(ParticleSpatialLayout<double,Dim>& L, ippl::Vector<double,Dim>& low, ippl::Vector<double,Dim>& fin, double dt_, double h_) : dt(dt_), h(h_), particles(L, low, fin, h_) {}
 
-    void pre_run(std::vector<Vector<double, Dim>> R_part, std::vector<Vector<double, Dim>> v_part, std::vector<double> E_part, std::vector<double> m_part, ippl::BC bc) 
+    Manager(ParticleSpatialLayout<double,Dim>& L, ippl::Vector<double,Dim>& low, ippl::Vector<double,Dim>& fin, double dt_, double h_, double Adiabatic_index_) : 
+    dt(dt_), h(h_), particles(L, low, fin, h_), Adiabatic_index(Adiabatic_index_) {}
+
+    void pre_run(std::vector<Vector<double, Dim>> R_part, std::vector<Vector<double, Dim>> v_part, std::vector<double> E_part, std::vector<double> m_part, std::array<ippl::BC,2*Dim> bcs) 
     {
         //int N_new = getdim(R_part);
         int N_new = R_part.size();
-        cout << "N_new: " << N_new << endl;
         particles.create(N_new);
 
         typename Manager<Dim, N>::particle_position_type::HostMirror R_host = particles.position.getHostMirror();
         typename Manager<Dim, N>::particle_position_type::HostMirror v_host = particles.velocity.getHostMirror();
         typename Manager<Dim, N>::particle_scalar_type::HostMirror m_host = particles.mass.getHostMirror();
+        typename Manager<Dim, N>::particle_scalar_type::HostMirror E_host = particles.energy_density.getHostMirror();
+
 
         for (unsigned int i = 0; i < N_new; ++i) {
 
             R_host(i) = R_part[i];
             v_host(i) = v_part[i];
             m_host(i) = m_part[i];
+            E_host(i) = E_part[i];
 
         }
 
         Kokkos::deep_copy(particles.position.getView(), R_host);
         Kokkos::deep_copy(particles.velocity.getView(), v_host);
         Kokkos::deep_copy(particles.mass.getView(), m_host);
+        Kokkos::deep_copy(particles.energy_density.getView(), E_host);
 
         // particles.update();
 
-        particles.setParticleBC(bc);
+        particles.setParticleBC(bcs);
+        this->bcs = bcs;
     }
 
-        //As a preliminary way we pass the function as an argument of pre_step()
-    void pre_step()
+    void pre_step(bool viscous = false)
         { 
-            //particles.acceleration_function_external(func);
-            cout << "before_update" << endl;
+            viscosity_factor<Dim> visc(0.1, 0.1);
             particles.updateNeighbors();
-            cout << "after_update" << endl;
+
             const std::size_t N_particles = particles.position.size();
             // TODO: Kokkos here?
             CubicSplineKernel<double, Dim> W;
@@ -94,30 +122,50 @@ public:
                     particles.density(p_idx) += particles.mass(*p_it)*W(rij, h);
                     
                 }
-                particles.pressure(p_idx) = pow(particles.density(p_idx), Adiabatic_index);
-                cout << "density: " << particles.density(p_idx) << endl;
+                if(viscous){
+                    particles.pressure(p_idx) = (Adiabatic_index-1)*particles.density(p_idx)*particles.energy_density(p_idx);
+                }
+                else{
+                    particles.pressure(p_idx) = pow(particles.density(p_idx), Adiabatic_index);
+                }
             }
 
             for(std::size_t p_idx = 0; p_idx < N_particles; ++p_idx){
                 auto nn = particles.CMHelper.neighbors(particles.position(p_idx));
                 particles.accel(p_idx) = 0.0;
                 for(auto p_it = nn.begin(); p_it != nn.end(); ++p_it){
-                    const auto& other_pos = particles.position(*p_it);
-                    ippl::Vector<double, Dim> d =  other_pos - particles.position(p_idx);
-                    double rij = std::sqrt(d.dot(d));
-                    double aux = ((particles.pressure(*p_it)/pow(particles.density(*p_it),2))-((particles.pressure(p_idx)/pow(particles.density(p_idx),2))));
-                    particles.accel(p_idx) += (-((d)*W.grad_r(rij, h))/rij)*(particles.mass(*p_it))*aux;
+                    if(p_idx != *p_it){
+                        const auto& other_pos = particles.position(*p_it);
+                        const auto& other_vel = particles.velocity(*p_it);
+                        ippl::Vector<double, Dim> d =  other_pos - particles.position(p_idx);
+                        ippl::Vector<double, Dim> vel =  other_vel - particles.velocity(p_idx);
+                        double rij = std::sqrt(d.dot(d));
+                        double vij = std::sqrt(vel.dot(vel));
+
+                        if (viscous) 
+                        {
+                            double aux = ((particles.pressure(*p_it)/pow(particles.density(*p_it) + eps,2))-((particles.pressure(p_idx)/pow(particles.density(p_idx) + eps,2))));
+                            double aux_1 = (((particles.pressure(p_idx)/pow(particles.density(p_idx) + eps,2))));
+
+                            particles.accel(p_idx) += (-((d)*W.grad_r(rij, h))/(rij + eps))*(particles.mass(*p_it))*aux;
+                            double density_mean = (particles.density(*p_it) + particles.density(p_idx))/2;
+
+                            particles.accel(p_idx) += particles.mass(*p_it)*(-((d)*W.grad_r(rij, h))/(rij + eps))*visc(0.1, density_mean, d, vel, h);
+                            particles.d_energy_density(p_idx) += (aux_1*particles.mass(*p_it)*vij*W.grad_r(rij, h)) + (0.5*particles.mass(*p_it)*visc(0.1, density_mean, d, vel, h)*vij*W.grad_r(rij, h));
+
+                        } 
+
+                        else 
+                        {
+                            double aux = ((particles.pressure(*p_it)/pow(particles.density(*p_it) + eps,2))-((particles.pressure(p_idx)/pow(particles.density(p_idx) + eps,2))));
+                            particles.accel(p_idx) += (-((d)*W.grad_r(rij, h))/(rij + eps))*(particles.mass(*p_it))*aux;
+                        }
+
+
+                    }
                 }
             }
-            //std::vector<SizeListCollection<Dim>> vector_NN = particles.CMHelper.neighbor_lists;
-            //cout << "vector_NN.size" << vector_NN.size() << endl;
-            //N_nn = NN_array.size() // for each particle
-            //for (int i = 0; i < N_nn; ++i) {particles.density(i) = sum_in_j(m[j] * CubicSplineKernel(particles.R(i)-NN_array[i][j]))
-            //particles.pressure(i) = (adiabatic_index-1)*particles.density(i)*particles.energy_density(i)}
-            //double aux = sum_in_j((particles.pressure(i)/pow(particles.density(i),2)) + (particles.pressure(j)/pow(particles.density(j),2)));
-            //annoying part with pressure and density = ...
-            //particles.acceleration(i) = sum_in_j(W(particles.R(i)-NN_array[i][j]))
-            //particles.d_energy_density(i) = sum_in_j(W(particles.R(i)-NN_array[i][j])) 
+
         }
 
        /**
@@ -137,27 +185,40 @@ public:
         */
         void advance() 
         { 
-            /* --- KDK scheme --- */
-            // v_{i+1/2}
+           
 
-            //vector operators are not working?? Velocity is not changing vectorially
+            /*particles.velocity = particles.velocity + particles.accel*dt/2.;
 
-            particles.velocity = particles.velocity + particles.accel*dt/2.;
-            // x_{i + 1}
-            particles.R = particles.R + particles.velocity*dt;
-            // Enforce bd conditions
-            //particles.set_bd();
-            // Compute acceleration at new position
-            //particles.smoothen();
-            // v_{i + 1}
-            particles.velocity = particles.velocity + particles.accel*dt/2.;
+            particles.position = particles.position + particles.velocity*dt;
 
-            //How we compute energy density??? particles.energy_density = particles.energy_density + particles.d_energy_density*dt;??
+            particles.velocity = particles.velocity + particles.accel*dt/2.;*/
 
-            // For debugging only
-            // std::cout << "Time-step\n";
+            const std::size_t N_particles = particles.position.size();
+    
+            for(std::size_t p_idx = 0; p_idx < N_particles; ++p_idx) {
+                // Update velocity with half of the acceleration
+                particles.velocity(p_idx) += particles.accel(p_idx) * dt / 2.;
 
-            //particles.update();
+                // Update position
+                particles.position(p_idx) += particles.velocity(p_idx) * dt;
+
+                particles.energy_density(p_idx) += particles.d_energy_density(p_idx) * dt;
+
+                // Reflective boundary conditions
+                for(unsigned int i = 0; i < Dim; ++i) {
+                    if(particles.position(p_idx)[i] < 0.05 || particles.position(p_idx)[i] > 0.95) {
+                        // Reflect the position
+                        particles.position(p_idx)[i] = std::max(0.05, std::min(0.95, particles.position(p_idx)[i])); // Clamp position to [0,1]
+
+                        // Reverse the speed in the respective direction
+                        particles.velocity(p_idx)[i] *= -1.0;
+                    }
+                }
+
+                // Update velocity with the other half of the acceleration
+                particles.velocity(p_idx) += particles.accel(p_idx) * dt / 2.;
+            }
+
 
         }
 
@@ -170,5 +231,4 @@ public:
         * @param nt The number of time steps to run the simulation.
         */
 };
-
 
