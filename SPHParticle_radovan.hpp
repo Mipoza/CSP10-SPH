@@ -158,6 +158,7 @@
 
 /* CubicSplineKernel for smoothening the QOI */
 /*template<typename T, unsigned DIM>
+/*template<typename T, unsigned DIM>
 struct CubicSplineKernel{
   CubicSplineKernel() = default;
   // Evaluation

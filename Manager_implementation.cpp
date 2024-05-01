@@ -4,22 +4,22 @@
 #include <cstdlib>
 #include <ctime>
 
-#include "include/Ippl.h"
+#include "../include/Ippl.h"
 
-#include "include/Expression/IpplExpressions.h" 
+#include "../include/Expression/IpplExpressions.h" 
 //#include "include/Expression/IpplOperators.h" 
 
-#include "include/Types/Vector.h"
-#include "include/Particle/ParticleLayout.h"
-#include "include/Particle/ParticleSpatialLayout.h"
-#include "include/Particle/ParticleBase.h"
-#include "include/Particle/ParticleAttribBase.h"
-#include "include/Particle/ParticleAttrib.h"
-#include "include/FieldLayout/FieldLayout.h"
-#include "include/Field/Field.h"
-#include "include/Field/BareField.h"
-#include "include/Meshes/CartesianCentering.h"
-#include "include/Particle/ParticleBC.h"
+#include "../include/Types/Vector.h"
+#include "../include/Particle/ParticleLayout.h"
+#include "../include/Particle/ParticleSpatialLayout.h"
+#include "../include/Particle/ParticleBase.h"
+#include "../include/Particle/ParticleAttribBase.h"
+#include "../include/Particle/ParticleAttrib.h"
+#include "../include/FieldLayout/FieldLayout.h"
+#include "../include/Field/Field.h"
+#include "../include/Field/BareField.h"
+#include "../include/Meshes/CartesianCentering.h"
+#include "../include/Particle/ParticleBC.h"
 
 #include "include/Manager/BaseManager.h"
 #include "Particle_SPH.h"
@@ -64,7 +64,7 @@ int main(int argc, char* argv[]) {
  		// all parallel layout, standard domain, normal axis order
  		FieldLayout<dim> layout(MPI_COMM_WORLD, owned, isParallel);	
  		double dx = 1.0 / 8.0;
-		double dt = 0.1;
+		double dt = 0.001;
 
  		Vector<double,dim> hx = {dx, dx};
  		Vector<double,dim> origin = {0.0, 0.0};

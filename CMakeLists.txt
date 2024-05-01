@@ -47,15 +47,22 @@ endif()
 
 add_definitions(-DIPPL_ENABLE_TIMER_FENCES=true)
 
-# Recursively find all header files (.hpp and .h) and add their directories to the include path
+# Recursively find all header files and add their directories to the include path
 file(GLOB_RECURSE HEADER_FILES "*.hpp" "*.h")
 foreach(HEADER ${HEADER_FILES})
     get_filename_component(HEADER_PATH ${HEADER} PATH)
     include_directories(${HEADER_PATH})
 endforeach()
 
-# Create the executable target
-add_executable(myprogram_IPPL_TRY ${SOURCES})
-target_link_libraries(myprogram_IPPL_TRY ${MPI_CXX_LIBRARIES} ${IPPL_LIBRARY_DIR})
-target_link_libraries(myprogram_IPPL_TRY ${MPI_CXX_LIBRARIES} ${KOKKOS_LIBRARIES} dl)
-
+# Linking libraries
+target_link_libraries(hello 
+    OpenMP::OpenMP_CXX 
+    MPI::MPI_CXX 
+    ippl 
+    ${KOKOS_LIB}
+    sfml-system 
+    sfml-window 
+    sfml-graphics 
+    sfml-network 
+    sfml-audio
+)

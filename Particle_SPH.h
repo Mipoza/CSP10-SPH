@@ -1,21 +1,21 @@
 #include <iostream>
 #include <cmath>
 
-#include "include/Ippl.h"
+#include "../include/Ippl.h"
 
-#include "include/Expression/IpplExpressions.h" 
+#include "../include/Expression/IpplExpressions.h" 
 //#include "include/Expression/IpplOperators.h" 
 
-#include "include/Types/Vector.h"
-#include "include/Particle/ParticleLayout.h"
-#include "include/Particle/ParticleSpatialLayout.h"
-#include "include/Particle/ParticleBase.h"
-#include "include/Particle/ParticleAttribBase.h"
-#include "include/Particle/ParticleAttrib.h"
-#include "include/FieldLayout/FieldLayout.h"
-#include "include/Field/Field.h"
-#include "include/Field/BareField.h"
-#include "include/Meshes/CartesianCentering.h"
+#include "../include/Types/Vector.h"
+#include "../include/Particle/ParticleLayout.h"
+#include "../include/Particle/ParticleSpatialLayout.h"
+#include "../include/Particle/ParticleBase.h"
+#include "../include/Particle/ParticleAttribBase.h"
+#include "../include/Particle/ParticleAttrib.h"
+#include "../include/FieldLayout/FieldLayout.h"
+#include "../include/Field/Field.h"
+#include "../include/Field/BareField.h"
+#include "../include/Meshes/CartesianCentering.h"
 
 #ifndef PARTICLE_SPH_H
 #define PARTICLE_SPH_H
