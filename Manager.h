@@ -2,24 +2,24 @@
 #include <iostream>
 #include <cmath>
 
-#include "include/Ippl.h"
+#include "../include/Ippl.h"
 
-#include "include/Expression/IpplExpressions.h" 
-//#include "include/Expression/IpplOperators.h" 
+#include "../include/Expression/IpplExpressions.h" 
+//#include "../include/Expression/IpplOperators.h" 
 
-#include "include/Types/Vector.h"
-#include "include/Particle/ParticleLayout.h"
-#include "include/Particle/ParticleSpatialLayout.h"
-#include "include/Particle/ParticleBase.h"
-#include "include/Particle/ParticleAttribBase.h"
-#include "include/Particle/ParticleAttrib.h"
-#include "include/FieldLayout/FieldLayout.h"
-#include "include/Field/Field.h"
-#include "include/Field/BareField.h"
-#include "include/Meshes/CartesianCentering.h"
-#include "include/Particle/ParticleBC.h"
+#include "../include/Types/Vector.h"
+#include "../include/Particle/ParticleLayout.h"
+#include "../include/Particle/ParticleSpatialLayout.h"
+#include "../include/Particle/ParticleBase.h"
+#include "../include/Particle/ParticleAttribBase.h"
+#include "../include/Particle/ParticleAttrib.h"
+#include "../include/FieldLayout/FieldLayout.h"
+#include "../include/Field/Field.h"
+#include "../include/Field/BareField.h"
+#include "../include/Meshes/CartesianCentering.h"
+#include "../include/Particle/ParticleBC.h"
 
-#include "include/Manager/BaseManager.h"
+#include "../include/Manager/BaseManager.h"
 #include "SPHParticle_radovan.hpp"
 
 
@@ -45,7 +45,6 @@ struct viscosity_factor{
         if (dot_product < 0) {return (-(alpha * c * mu) + (beta * mu * mu)) / (density + eps);} 
         else {return 0;}
     }
-
 
 };
 
@@ -105,12 +104,14 @@ public:
 
     void pre_step(bool viscous = false)
         { 
-            viscosity_factor<Dim> visc(2.0, 1.2);
+            // viscosity_factor<Dim> visc(2.0, 1.2);
+            viscosity_factor<Dim> visc(0.1, 0.2);
             particles.updateNeighbors();
 
             const std::size_t N_particles = particles.position.size();
             // TODO: Kokkos here?
             CubicSplineKernel<double, Dim> W;
+            #pragma omp parllel for
             for(std::size_t p_idx = 0; p_idx < N_particles; ++p_idx){
                 auto nn = particles.CMHelper.neighbors(particles.position(p_idx));
                 particles.density(p_idx) = 0.0;
@@ -129,7 +130,8 @@ public:
                     particles.pressure(p_idx) = pow(particles.density(p_idx), Adiabatic_index);
                 }
             }
-
+            
+            #pragma omp parllel for
             for(std::size_t p_idx = 0; p_idx < N_particles; ++p_idx){
                 auto nn = particles.CMHelper.neighbors(particles.position(p_idx));
                 particles.accel(p_idx) = 0.0;
@@ -144,20 +146,23 @@ public:
 
                         if (viscous) 
                         {
-                            double aux = ((particles.pressure(*p_it)/pow(particles.density(*p_it) + eps,2))-((particles.pressure(p_idx)/pow(particles.density(p_idx) + eps,2))));
+                            double aux = ((particles.pressure(*p_it)/pow(particles.density(*p_it) + eps,2))
+                                -((particles.pressure(p_idx)/pow(particles.density(p_idx) + eps,2))));
                             double aux_1 = (((particles.pressure(p_idx)/pow(particles.density(p_idx) + eps,2))));
 
                             particles.accel(p_idx) += (-((d)*W.grad_r(rij, h))/(rij + eps))*(particles.mass(*p_it))*aux;
                             double density_mean = (particles.density(*p_it) + particles.density(p_idx))/2;
 
                             particles.accel(p_idx) += particles.mass(*p_it)*(-((d)*W.grad_r(rij, h))/(rij + eps))*visc(0.1, density_mean, d, vel, h);
-                            particles.d_energy_density(p_idx) += (aux_1*particles.mass(*p_it)*vij*W.grad_r(rij, h)) + (0.5*particles.mass(*p_it)*visc(0.1, density_mean, d, vel, h)*vij*W.grad_r(rij, h));
+                            particles.d_energy_density(p_idx) += (aux_1*particles.mass(*p_it)*vij*W.grad_r(rij, h))
+                              + (0.5*particles.mass(*p_it)*visc(0.1, density_mean, d, vel, h)*vij*W.grad_r(rij, h));
 
                         } 
 
                         else 
                         {
-                            double aux = ((particles.pressure(*p_it)/pow(particles.density(*p_it) + eps,2))-((particles.pressure(p_idx)/pow(particles.density(p_idx) + eps,2))));
+                            double aux = ((particles.pressure(*p_it)/pow(particles.density(*p_it) + eps,2))
+                                -((particles.pressure(p_idx)/pow(particles.density(p_idx) + eps,2))));
                             particles.accel(p_idx) += (-((d)*W.grad_r(rij, h))/(rij + eps))*(particles.mass(*p_it))*aux;
                         }
 
@@ -194,7 +199,8 @@ public:
             particles.velocity = particles.velocity + particles.accel*dt/2.;*/
 
             const std::size_t N_particles = particles.position.size();
-    
+            
+            #pragma omp parallel for
             for(std::size_t p_idx = 0; p_idx < N_particles; ++p_idx) {
                 // Update velocity with half of the acceleration
                 particles.velocity(p_idx) += particles.accel(p_idx) * dt / 2.;
