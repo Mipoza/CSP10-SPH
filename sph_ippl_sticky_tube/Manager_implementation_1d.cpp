@@ -26,7 +26,6 @@
 #include "SPHParticle_radovan.hpp"
 #include "Manager.h"
 
-#include <SFML/Graphics.hpp>
 
 using namespace ippl;
 using namespace std;
@@ -79,9 +78,6 @@ double rand_minus1_to_1() {
 
 
 int main(int argc, char* argv[]) {
-	int width = 800;
-	int height = 600;
-	sf::RenderWindow window(sf::VideoMode(width, height), "SPH Simulation");
 
 	initialize(argc, argv);
 	{
@@ -107,34 +103,48 @@ int main(int argc, char* argv[]) {
 
 		double h = 0.01;
 
-    Manager<1> manager(myparticlelayout, origin, fin, dt, h, 1.4);
-    std::vector<Vector<double, 1>> R_part_0;
-    std::vector<Vector<double, 1>> v_part_0;
+        Manager<1> manager(myparticlelayout, origin, fin, dt, h, 1.4);
+        std::vector<Vector<double, 1>> R_part_0;
+        std::vector<Vector<double, 1>> v_part_0;
 		std::vector<double> m_part_0;
 		std::vector<double> E_part_0;
+        std::vector<double> entropy_part_0;
 
     // //Initializing random particle positions and velocities within Manager object
 
-    const double mass = 1e-3;
-    double T = 27300;
-    std::random_device rd;  // Non-deterministic random number generator
-    std::mt19937 gen(rd()); // Mersenne Twister pseudo-random generator, seeded with rd()
-    std::uniform_real_distribution<> dist(0.0, 1.0); // Uniform distribution between 0 and 1
-    const unsigned N_particles = 2500;
-    for(unsigned i = 0; i < N_particles; ++i){
-		  double x = dist(gen)/2;
-		  double v = maxwellBoltzmann(mass, T);
+        const double mass = 1e-3;
+        double T = 2730000;
+        std::random_device rd;  // Non-deterministic random number generator
+        std::mt19937 gen(rd()); // Mersenne Twister pseudo-random generator, seeded with rd()
+        std::uniform_real_distribution<> dist(0.0, 1.0); // Uniform distribution between 0 and 1
+        const unsigned N_particles = 5000;
+        for(unsigned i = 0; i < N_particles; ++i){
+            double x = dist(gen)/2.0;
+            double v = maxwellBoltzmann(mass, T);
 
-		  R_part_0.push_back(Vector<double, 1>(x));
-		  v_part_0.push_back(Vector<double, 1>(v));
-		  m_part_0.push_back(mass);
-		  E_part_0.push_back(10.0);
-    }
+            R_part_0.push_back(Vector<double, 1>(x));
+            v_part_0.push_back(Vector<double, 1>(v));
+            m_part_0.push_back(mass);
+            E_part_0.push_back(10.0);
+            entropy_part_0.push_back(1.0);
+        }
+
+        double T2 = 2730000;
+
+        for (unsigned i = 0; i < 500; i++)
+        {   
+            double v = maxwellBoltzmann(mass, T2);
+            R_part_0.push_back(Vector<double, 1>(0.51 + (i * 0.0007)));
+            v_part_0.push_back(Vector<double, 1>(v));
+            m_part_0.push_back(mass);
+            E_part_0.push_back(10.0);
+            entropy_part_0.push_back(1.0);
+        }
 
 		array<ippl::BC, 2> bcs = {ippl::BC::PERIODIC, ippl::BC::PERIODIC};
 
-    const bool visc = true;
-    manager.pre_run(R_part_0, v_part_0, E_part_0, m_part_0 , bcs);
+        const bool visc = true;
+        manager.pre_run(R_part_0, v_part_0, E_part_0, m_part_0, entropy_part_0, bcs);
 		manager.pre_step(visc);
 
 
@@ -143,36 +153,11 @@ int main(int argc, char* argv[]) {
 
 		for (unsigned int i = 0; i < N_times; i++)
 		{
-			window.clear();
-
-			float minRho = manager.particles.density(0);
-			float maxRho = manager.particles.density(0);
-
-			for(int k = 0; k < manager.particles.density.size(); k++){
-				if(minRho > manager.particles.density(k))
-					minRho = manager.particles.density(k);
-				if(maxRho < manager.particles.density(k))
-					maxRho = manager.particles.density(k);
-			}
-			auto pos = manager.particles.position;
-			for (int j = 0; j < pos.size(); j++) {
-				sf::CircleShape circle(4.0f);   
-
-				float t = (manager.particles.density(j) - minRho) / ((maxRho - minRho + 0.001));
-				//cout << manager.particles.position(j)[1] << endl;
-				sf::Color color(static_cast<sf::Uint8>(255 * t), 0, static_cast<sf::Uint8>(255 * (1-t)));
-				//sf::Color color(0,0,255);
-				circle.setFillColor(color);
-
-				circle.setPosition(pos(j)[0]*width, 0.5*height);//pos(j)[1]*height); 
-				window.draw(circle);
-      }
-
 			manager.pre_step(visc);
 			manager.advance();
-			window.display();
 
 			cout << "energy_density " << manager.particles.energy_density(200) << endl;
+            cout << "entropy " << manager.particles.entropy(200) << endl;
 			cout << "density " << manager.particles.density(200) << endl;
 			cout << "pressure " << manager.particles.pressure(200) << endl;
 		}
