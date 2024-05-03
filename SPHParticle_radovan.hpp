@@ -10,15 +10,20 @@
 
 template<typename T, unsigned DIM>
 struct CubicSplineKernel{
-    CubicSplineKernel(){
-      assert(DIM == 2);
-    };
-
     // Evaluation
     // Modified to match the normalization of the provided W function
     inline T operator()(T r, T h) {
         const T q = std::abs(r) / h;
-        const T sigma = static_cast<T>(10.0 / (7 * M_PI * std::pow(h, 2))); // normalization constant for dim 2
+        // Normalization constant
+        T sigma;
+        if constexpr(DIM == 1)
+          sigma = static_cast<T>(2.0 / (3 * h));
+        else if constexpr(DIM == 2)
+          sigma = static_cast<T>(10.0 / (7 * M_PI * std::pow(h, 2)));
+        else if constexpr(DIM == 3)
+          sigma = static_cast<T>(1.0 / (M_PI * std::pow(h, 3)));
+        else
+          static_assert(DIM == 1 || DIM == 2 || DIM == 3, "Only 1, 2, 3 dimensions supported");
 
         if (q >= 0 && q <= 1)
             return sigma * (1 - 1.5 * std::pow(q, 2) * (1 - q / 2));
