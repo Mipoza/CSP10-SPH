@@ -1,0 +1,37 @@
+project(HelloIPPL CXX)
+
+cmake_minimum_required(VERSION 3.0)
+
+add_compile_options(-fopenmp -ggdb)
+set (CMAKE_CXX_STANDARD 20)
+
+# Include directories
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../../include)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../../Kokkos/Kokkos_serial/include/)
+
+# Finding libraries
+file(GLOB KOKOS_LIB ${CMAKE_CURRENT_SOURCE_DIR}/../../Kokkos/Kokkos_serial/lib64/*.a)
+link_directories(ippl ${CMAKE_CURRENT_SOURCE_DIR}/../../lib)
+
+# Executable
+add_executable(shock_tube_1d shock_tube_1d.cpp)
+
+# Find required packages
+find_package(OpenMP REQUIRED)
+find_package(MPI REQUIRED)
+# find_package(SFML 2.5 COMPONENTS system window graphics network audio REQUIRED)
+
+# Recursively find all header files and add their directories to the include path
+file(GLOB_RECURSE HEADER_FILES "*.hpp" "*.h")
+foreach(HEADER ${HEADER_FILES})
+    get_filename_component(HEADER_PATH ${HEADER} PATH)
+    include_directories(${HEADER_PATH})
+endforeach()
+
+# Linking libraries
+target_link_libraries(shock_tube_1d 
+    OpenMP::OpenMP_CXX 
+    MPI::MPI_CXX 
+    ippl 
+    ${KOKOS_LIB} -ldl
+)

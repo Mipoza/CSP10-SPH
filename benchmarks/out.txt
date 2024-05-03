@@ -1,0 +1,1 @@
+slurmstepd: error: execve(): /cluster/home/mdemiguel/CSP/CSP10-SPH/benchmarks/./shock_tube_1d.cpp: Permission denied
