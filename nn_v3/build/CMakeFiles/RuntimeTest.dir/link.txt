@@ -1,0 +1,1 @@
+/usr/bin/c++ -rdynamic CMakeFiles/RuntimeTest.dir/runtime_test.o -o RuntimeTest  -lgomp -Wl,-Bstatic -lpthread -Wl,-Bdynamic 

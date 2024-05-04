@@ -129,6 +129,34 @@ SharedMemoryNearestNeighbor/fast:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/SharedMemoryNearestNeighbor.dir/build.make CMakeFiles/SharedMemoryNearestNeighbor.dir/build
 .PHONY : SharedMemoryNearestNeighbor/fast
 
+#=============================================================================
+# Target rules for targets named RuntimeTest
+
+# Build rule for target.
+RuntimeTest: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 RuntimeTest
+.PHONY : RuntimeTest
+
+# fast build rule for target.
+RuntimeTest/fast:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/RuntimeTest.dir/build.make CMakeFiles/RuntimeTest.dir/build
+.PHONY : RuntimeTest/fast
+
+# target to build an object file
+runtime_test.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/RuntimeTest.dir/build.make CMakeFiles/RuntimeTest.dir/runtime_test.o
+.PHONY : runtime_test.o
+
+# target to preprocess a source file
+runtime_test.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/RuntimeTest.dir/build.make CMakeFiles/RuntimeTest.dir/runtime_test.i
+.PHONY : runtime_test.i
+
+# target to generate assembly for a file
+runtime_test.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/RuntimeTest.dir/build.make CMakeFiles/RuntimeTest.dir/runtime_test.s
+.PHONY : runtime_test.s
+
 # target to build an object file
 test.o:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/SharedMemoryNearestNeighbor.dir/build.make CMakeFiles/SharedMemoryNearestNeighbor.dir/test.o
@@ -152,7 +180,11 @@ help:
 	@echo "... depend"
 	@echo "... edit_cache"
 	@echo "... rebuild_cache"
+	@echo "... RuntimeTest"
 	@echo "... SharedMemoryNearestNeighbor"
+	@echo "... runtime_test.o"
+	@echo "... runtime_test.i"
+	@echo "... runtime_test.s"
 	@echo "... test.o"
 	@echo "... test.i"
 	@echo "... test.s"

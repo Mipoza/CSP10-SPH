@@ -30,14 +30,23 @@ def plot_2d():
     pos = pd.read_csv("data_2d/pos.csv").values.T
     neighbors = pd.read_csv("data_2d/neighbors.csv").values.T
     particle = pd.read_csv("data_2d/particle.csv").values.T
-    r = pd.read_csv("data_2d/rad.csv").values[0]
+    rNN = pd.read_csv("data_2d/rad.csv").values[0]
+    r, Nx, Ny = rNN[0], int(rNN[1]), int(rNN[2])
+    
+    assert(Nx == Ny)
+    tick_loc = np.linspace(0, 1, Nx + 1) # Nx == Ny
+    # tick_loc_y = np.linspace(0, 1, Ny+ 1)
     
     fig, ax = plt.subplots()
     ax.set_aspect('equal')
     ax.scatter(pos[0], pos[1], s = 2, c = 'black', alpha = 0.1)
-    ax.scatter(neighbors[0], neighbors[1], s = 5, c = 'blue')
-    ax.scatter(particle[0], particle[1], s = 5, c = 'red')
+    ax.scatter(neighbors[0], neighbors[1], s = 2, c = 'blue')
+    ax.scatter(particle[0], particle[1], s = 2, c = 'red')
     
+    ax.set_xticks(tick_loc)
+    ax.set_yticks(tick_loc)
+    ax.grid(color = 'black')
+
     circ = plt.Circle((particle[0], particle[1]), r, 
                       color = 'red', fill = False)
     ax.add_patch(circ)
