@@ -5,11 +5,14 @@
 #include <iostream>
 
 #include "ChainingMesh.hpp"
+#include <cassert>
 
 
 template<typename T, unsigned DIM>
 struct CubicSplineKernel{
-    CubicSplineKernel() = default;
+    CubicSplineKernel(){
+      assert(DIM == 2);
+    };
 
     // Evaluation
     // Modified to match the normalization of the provided W function
@@ -48,9 +51,9 @@ struct SPHParticle: public ippl::ParticleBase<ippl::ParticleSpatialLayout<T, DIM
   typedef ippl::ParticleSpatialLayout<T, DIM> PLayout_t;
   // Smoothing kernel length
   T kernel_size;
-  T alpha = 1.2,
-    beta  = 2.4,
-    eps = 1e-2,
+  T alpha = 0.1,
+    beta  = 0.2,
+    eps = 1e-4,
     gamm = 1.4;
   // The kernel itself
   KERNEL K;
