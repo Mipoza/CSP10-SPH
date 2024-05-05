@@ -1,0 +1,1 @@
+/usr/bin/c++ -O3 -DNDEBUG -rdynamic -DKOKKOS_DEPENDENCE CMakeFiles/RuntimeTest.dir/runtime_test.o -o RuntimeTest  /usr/lib/libkokkoscontainers.so.4.3.0 /usr/lib/libkokkoscore.so.4.3.0 -lgomp -Wl,-Bstatic -lpthread -Wl,-Bdynamic /usr/lib/libhwloc.so -ldl /usr/lib/libkokkossimd.so.4.3.0 

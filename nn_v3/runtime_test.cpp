@@ -50,6 +50,7 @@ void runtime_test(std::size_t N, T mesh_width) {
   double dur_insert = (double)dur_/nruns;
 
   CM.add_particles(pos_vec);
+  std::vector<T> dummy(N);
   // std::cout << "Iterating through " << N << " particles" << std::endl;
   start = std::chrono::high_resolution_clock::now();
   for(unsigned run = 0; run < nruns; ++run){
@@ -57,12 +58,11 @@ void runtime_test(std::size_t N, T mesh_width) {
     for(std::size_t p_idx = 0; p_idx < N; ++p_idx){
       const auto& my_pos = pos_vec[p_idx];
       auto nn = CM.neighbors(my_pos);
-      T dummy = 0;
       for(auto it = nn.begin(); it != nn.end(); ++it){
         // Neighbor position
         const auto& other_pos = pos_vec[*it];
         // Compute some dummy quantity
-        dummy += other_pos[0]*my_pos[0] + other_pos[1]*my_pos[1];
+        dummy[p_idx] += other_pos[0]*my_pos[0] + other_pos[1]*my_pos[1];
       }
     }
   }
