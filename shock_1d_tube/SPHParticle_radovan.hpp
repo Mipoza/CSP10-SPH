@@ -1,24 +1,27 @@
-#include "../include/Particle/ParticleBase.h"
-#include "../include/Particle/ParticleAttrib.h"
+#include "include/Particle/ParticleBase.h"
+#include "include/Particle/ParticleAttrib.h"
 #pragma once
 #include <cmath>
 #include <iostream>
 
 #include "ChainingMesh.hpp"
-#include <cassert>
-
 
 template<typename T, unsigned DIM>
 struct CubicSplineKernel{
-    CubicSplineKernel(){
-      assert(DIM == 2);
-    };
-
     // Evaluation
     // Modified to match the normalization of the provided W function
     inline T operator()(T r, T h) {
         const T q = std::abs(r) / h;
-        const T sigma = static_cast<T>(10.0 / (7 * M_PI * std::pow(h, 2))); // normalization constant for dim 2
+        // Normalization constant
+        T sigma;
+        if constexpr(DIM == 1)
+          sigma = static_cast<T>(2.0 / (3 * h));
+        else if constexpr(DIM == 2)
+          sigma = static_cast<T>(10.0 / (7 * M_PI * std::pow(h, 2)));
+        else if constexpr(DIM == 3)
+          sigma = static_cast<T>(1.0 / (M_PI * std::pow(h, 3)));
+        else
+          static_assert(DIM == 1 || DIM == 2 || DIM == 3, "Only 1, 2, 3 dimensions supported");
 
         if (q >= 0 && q <= 1)
             return sigma * (1 - 1.5 * std::pow(q, 2) * (1 - q / 2));
@@ -32,7 +35,16 @@ struct CubicSplineKernel{
     // Adapted for gradient calculation
     inline T grad_r(T r, T h) {
         const T q = std::abs(r) / h;
-        const T sigma = static_cast<T>(10.0 / (7 * M_PI * std::pow(h, 3))); // normalization constant for dim 2
+
+        T sigma;
+        if constexpr(DIM == 1)
+          sigma = static_cast<T>(2.0 / (3 * h*h));
+        else if constexpr(DIM == 2)
+          sigma = static_cast<T>(10.0 / (7 * M_PI * std::pow(h, 3)));
+        else if constexpr(DIM == 3)
+          sigma = static_cast<T>(1.0 / (M_PI * std::pow(h, 4)));
+        else
+          static_assert(DIM == 1 || DIM == 2 || DIM == 3, "Only 1, 2, 3 dimensions supported");
 
         if (q >= 0 && q <= 1)
             return sigma * (3/4) * q*(3*q-4);
@@ -51,9 +63,9 @@ struct SPHParticle: public ippl::ParticleBase<ippl::ParticleSpatialLayout<T, DIM
   typedef ippl::ParticleSpatialLayout<T, DIM> PLayout_t;
   // Smoothing kernel length
   T kernel_size;
-  T alpha = 0.1,
-    beta  = 0.2,
-    eps = 1e-4,
+  T alpha = 1.2,
+    beta  = 2.4,
+    eps = 1e-2,
     gamm = 1.4;
   // The kernel itself
   KERNEL K;
@@ -62,7 +74,8 @@ struct SPHParticle: public ippl::ParticleBase<ippl::ParticleSpatialLayout<T, DIM
   ChainingMeshHelper<T, DIM, false> CMHelper;
 
   // Physical quantities
-  ippl::ParticleAttrib<T> mass, density, pressure, energy_density, d_energy_density;
+  ippl::ParticleAttrib<T> mass, density, pressure, energy_density, 
+  d_energy_density, entropy, d_entropy;
   ippl::ParticleBase<PLayout_t>::particle_position_type 
     position, velocity, accel;
 
@@ -82,6 +95,8 @@ struct SPHParticle: public ippl::ParticleBase<ippl::ParticleSpatialLayout<T, DIM
     this->addAttribute(energy_density);
     this->addAttribute(d_energy_density);
     this->addAttribute(accel);
+    this->addAttribute(entropy);
+    this->addAttribute(d_entropy);
   }
 
   void updateNeighbors(){
