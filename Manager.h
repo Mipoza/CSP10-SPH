@@ -26,7 +26,7 @@
 using namespace ippl;
 using namespace std;
 
-#define eps 1e-4
+#define eps 1e-3
 
 
 template <unsigned int dim>
@@ -39,22 +39,15 @@ struct viscosity_factor{
 
         double rij = std::sqrt(dis.dot(dis));
         double dot_product = dis.dot(vel);
-        double mu = h*dot_product/(std::pow(rij,2) + eps*pow(h,2));
+        double mu = h*dot_product/(std::pow(rij,2) + 0.01*std::pow(h,2));
 
-        
         if (dot_product < 0) {return (-(alpha * c * mu) + (beta * mu * mu)) / (density + eps);} 
         else {return 0;}
     }
 
 };
 
-template<unsigned int Dim, unsigned int N>
-unsigned int getdim(Vector<Vector<double, Dim>,N>)
-{
-    return N;
-}
-
-template<unsigned int Dim, unsigned int N>
+template<unsigned int Dim>
 class Manager: public BaseManager {
 public:
     using particle_position_type  = ParticleAttrib<Vector<double, Dim>>;
@@ -70,16 +63,17 @@ public:
     Manager(ParticleSpatialLayout<double,Dim>& L, ippl::Vector<double,Dim>& low, ippl::Vector<double,Dim>& fin, double dt_, double h_, double Adiabatic_index_) : 
     dt(dt_), h(h_), particles(L, low, fin, h_), Adiabatic_index(Adiabatic_index_) {}
 
-    void pre_run(std::vector<Vector<double, Dim>> R_part, std::vector<Vector<double, Dim>> v_part, std::vector<double> E_part, std::vector<double> m_part, std::array<ippl::BC,2*Dim> bcs) 
+    void pre_run(std::vector<Vector<double, Dim>> R_part, std::vector<Vector<double, Dim>> v_part, std::vector<double> E_part, 
+    std::vector<double> m_part, std::vector<double> entropy_part,  std::array<ippl::BC,2*Dim> bcs) 
     {
-        //int N_new = getdim(R_part);
         int N_new = R_part.size();
         particles.create(N_new);
 
-        typename Manager<Dim, N>::particle_position_type::HostMirror R_host = particles.position.getHostMirror();
-        typename Manager<Dim, N>::particle_position_type::HostMirror v_host = particles.velocity.getHostMirror();
-        typename Manager<Dim, N>::particle_scalar_type::HostMirror m_host = particles.mass.getHostMirror();
-        typename Manager<Dim, N>::particle_scalar_type::HostMirror E_host = particles.energy_density.getHostMirror();
+        typename Manager<Dim>::particle_position_type::HostMirror R_host = particles.position.getHostMirror();
+        typename Manager<Dim>::particle_position_type::HostMirror v_host = particles.velocity.getHostMirror();
+        typename Manager<Dim>::particle_scalar_type::HostMirror m_host = particles.mass.getHostMirror();
+        //typename Manager<Dim>::particle_scalar_type::HostMirror E_host = particles.energy_density.getHostMirror();
+        typename Manager<Dim>::particle_scalar_type::HostMirror entropy_host = particles.entropy.getHostMirror();
 
 
         for (unsigned int i = 0; i < N_new; ++i) {
@@ -87,31 +81,34 @@ public:
             R_host(i) = R_part[i];
             v_host(i) = v_part[i];
             m_host(i) = m_part[i];
-            E_host(i) = E_part[i];
+            //E_host(i) = E_part[i];
+            entropy_host(i) = entropy_part[i];
 
         }
 
         Kokkos::deep_copy(particles.position.getView(), R_host);
         Kokkos::deep_copy(particles.velocity.getView(), v_host);
         Kokkos::deep_copy(particles.mass.getView(), m_host);
-        Kokkos::deep_copy(particles.energy_density.getView(), E_host);
+        //Kokkos::deep_copy(particles.energy_density.getView(), E_host);
+        Kokkos::deep_copy(particles.entropy.getView(), entropy_host);
 
         // particles.update();
 
-        particles.setParticleBC(bcs);
-        this->bcs = bcs;
+        //particles.setParticleBC(bcs);
+        //this->bcs = bcs;
     }
 
     void pre_step(bool viscous = false)
         { 
             // viscosity_factor<Dim> visc(2.0, 1.2);
-            viscosity_factor<Dim> visc(0.1, 0.2);
+            viscosity_factor<Dim> visc(1.0, 2.0);
             particles.updateNeighbors();
+            cout << "after_update" << endl;
 
             const std::size_t N_particles = particles.position.size();
             // TODO: Kokkos here?
             CubicSplineKernel<double, Dim> W;
-            #pragma omp parllel for
+            #pragma omp parallel for
             for(std::size_t p_idx = 0; p_idx < N_particles; ++p_idx){
                 auto nn = particles.CMHelper.neighbors(particles.position(p_idx));
                 particles.density(p_idx) = 0.0;
@@ -120,21 +117,19 @@ public:
                     const auto& other_pos = particles.position(*p_it);
                     ippl::Vector<double, Dim> d =  other_pos - particles.position(p_idx);
                     double rij = std::sqrt(d.dot(d));
-                    particles.density(p_idx) += particles.mass(*p_it)*W(rij, h);
+                    particles.density(p_idx) = particles.density(p_idx) + particles.mass(*p_it)*W(rij, h);
                     
                 }
-                if(viscous){
-                    particles.pressure(p_idx) = (Adiabatic_index-1)*particles.density(p_idx)*particles.energy_density(p_idx);
-                }
-                else{
-                    particles.pressure(p_idx) = pow(particles.density(p_idx), Adiabatic_index);
-                }
+                particles.pressure(p_idx) = particles.entropy(p_idx)*pow(particles.density(p_idx), Adiabatic_index);
+                particles.energy_density(p_idx) = particles.entropy(p_idx)*std::pow(particles.density(p_idx), Adiabatic_index - 1.0)/(Adiabatic_index - 1.0);
             }
             
-            #pragma omp parllel for
+            #pragma omp parallel for
             for(std::size_t p_idx = 0; p_idx < N_particles; ++p_idx){
                 auto nn = particles.CMHelper.neighbors(particles.position(p_idx));
                 particles.accel(p_idx) = 0.0;
+                particles.d_energy_density(p_idx) = 0.0;
+                particles.d_entropy(p_idx) = 0.0;
                 for(auto p_it = nn.begin(); p_it != nn.end(); ++p_it){
                     if(p_idx != *p_it){
                         const auto& other_pos = particles.position(*p_it);
@@ -147,26 +142,41 @@ public:
                         if (viscous) 
                         {
                             double aux = ((particles.pressure(*p_it)/pow(particles.density(*p_it) + eps,2))
-                                -((particles.pressure(p_idx)/pow(particles.density(p_idx) + eps,2))));
+                                +((particles.pressure(p_idx)/pow(particles.density(p_idx) + eps,2))));
                             double aux_1 = (((particles.pressure(p_idx)/pow(particles.density(p_idx) + eps,2))));
 
-                            particles.accel(p_idx) += (-((d)*W.grad_r(rij, h))/(rij + eps))*(particles.mass(*p_it))*aux;
+                            particles.accel(p_idx) = particles.accel(p_idx) - (-((d)*W.grad_r(rij, h))/(rij + eps))*(particles.mass(*p_it))*aux;
                             double density_mean = (particles.density(*p_it) + particles.density(p_idx))/2;
 
-                            particles.accel(p_idx) += particles.mass(*p_it)*(-((d)*W.grad_r(rij, h))/(rij + eps))*visc(0.1, density_mean, d, vel, h);
-                            particles.d_energy_density(p_idx) += (aux_1*particles.mass(*p_it)*vij*W.grad_r(rij, h))
-                              + (0.5*particles.mass(*p_it)*visc(0.1, density_mean, d, vel, h)*vij*W.grad_r(rij, h));
+                            // Mean sound velocity
+                            const double c_ij_bar = (std::sqrt(abs(Adiabatic_index*particles.pressure(p_idx)/(particles.density(p_idx) + eps)))
+                                + std::sqrt(abs(Adiabatic_index*particles.pressure(*p_it)/(particles.density(*p_it) + eps))))/2.;
+
+
+                            particles.accel(p_idx) = particles.accel(p_idx) - particles.mass(*p_it)*(-((d)*W.grad_r(rij, h))/(rij + eps))*visc(c_ij_bar, density_mean, d, vel, h);
+
+                            //particles.d_energy_density(p_idx) = particles.d_energy_density(p_idx) + (aux_1*particles.mass(*p_it)*vel.dot((-(d)*W.grad_r(rij, h))/(rij + eps)))
+                            //  + (0.5*particles.mass(*p_it)*visc(0.1, density_mean, d, vel, h)*vel.dot((-(d)*W.grad_r(rij, h))/(rij + eps)));
+
+
+                            // cout  << "visc " << visc(c_ij_bar, density_mean, d, vel, h) << endl;
+                            // cout << "grad_r " << W.grad_r(rij, h) << endl;
+
+                            particles.d_entropy(p_idx) = particles.d_entropy(p_idx) + 
+                            ((Adiabatic_index-1.0)/std::pow(particles.density(p_idx)+eps, Adiabatic_index -1.0))*
+                            (0.5*particles.mass(*p_it)*visc(c_ij_bar, density_mean, d, vel, h)*vel.dot((-(d)*W.grad_r(rij, h))/(rij + eps)));
 
                         } 
 
                         else 
                         {
+                            double aux_1 = (((particles.pressure(p_idx)/pow(particles.density(p_idx) + eps,2))));
+                            particles.d_energy_density(p_idx) = particles.d_energy_density(p_idx) + 
+                            (aux_1*particles.mass(*p_it)*vel.dot((-(d)*W.grad_r(rij, h))/(rij + eps)));
                             double aux = ((particles.pressure(*p_it)/pow(particles.density(*p_it) + eps,2))
-                                -((particles.pressure(p_idx)/pow(particles.density(p_idx) + eps,2))));
-                            particles.accel(p_idx) += (-((d)*W.grad_r(rij, h))/(rij + eps))*(particles.mass(*p_it))*aux;
+                                +((particles.pressure(p_idx)/pow(particles.density(p_idx) + eps,2))));
+                            particles.accel(p_idx) = particles.accel(p_idx) - (-((d)*W.grad_r(rij, h))/(rij + eps))*(particles.mass(*p_it))*aux;
                         }
-
-
                     }
                 }
             }
@@ -199,16 +209,77 @@ public:
             particles.velocity = particles.velocity + particles.accel*dt/2.;*/
 
             const std::size_t N_particles = particles.position.size();
+
+            std::vector<double> k1_v(N_particles), k2_v(N_particles), k3_v(N_particles), k4_v(N_particles);
+            std::vector<double> k1_p(N_particles), k2_p(N_particles), k3_p(N_particles), k4_p(N_particles);
             
             #pragma omp parallel for
             for(std::size_t p_idx = 0; p_idx < N_particles; ++p_idx) {
                 // Update velocity with half of the acceleration
-                particles.velocity(p_idx) += particles.accel(p_idx) * dt / 2.;
+                // particles.velocity(p_idx) = particles.velocity(p_idx) + particles.accel(p_idx) * dt / 2.;
+
+                // // Update position
+                // particles.position(p_idx) = particles.position(p_idx) + particles.velocity(p_idx) * dt;
+
+                // //particles.energy_density(p_idx) = particles.energy_density(p_idx) + particles.d_energy_density(p_idx) * dt;
+
+                // particles.entropy(p_idx) = particles.entropy(p_idx) + particles.d_entropy(p_idx) * dt;
+
+                // // Reflective boundary conditions
+                // for(unsigned int i = 0; i < Dim; ++i) {
+                //     if(particles.position(p_idx)[i] < 0.05 || particles.position(p_idx)[i] > 0.95) {
+                //         // Reflect the position
+                //         particles.position(p_idx)[i] = std::max(0.05, std::min(0.95, particles.position(p_idx)[i])); // Clamp position to [0,1]
+
+                //         // Reverse the speed in the respective direction
+                //         particles.velocity(p_idx)[i] *= -1.0;
+                //     }
+                // }     
+                               
+                // for(unsigned int i = 0; i < Dim; ++i) {
+                //     if(particles.position(p_idx)[i] < 0.01)
+                //       particles.position(p_idx)[i] = 0.98;
+                //     else if(particles.position(p_idx)[i] > 0.99)
+                //       particles.position(p_idx)[i] = 0.02;
+                // }
+
+                // Update velocity with the other half of the acceleration
+               // particles.velocity(p_idx) = particles.velocity(p_idx) + particles.accel(p_idx) * dt / 2.;
+
+                    // Initial values
+                auto initial_velocity = particles.velocity(p_idx);
+                auto initial_position = particles.position(p_idx);
+                auto initial_entropy = particles.entropy(p_idx);
+                
+                // First step of Runge-Kutta
+                auto k1_velocity = particles.accel(p_idx) * dt / 2.;
+                auto k1_position = initial_velocity * dt;
+                auto k1_entropy = particles.d_entropy(p_idx) * dt;
+
+                // Second step of Runge-Kutta
+                auto k2_velocity = particles.accel(p_idx) * dt / 2.;
+                auto k2_position = (initial_velocity + k1_velocity / 2.0) * dt;
+                auto k2_entropy = particles.d_entropy(p_idx) * dt;
+
+                // Third step of Runge-Kutta
+                auto k3_velocity = particles.accel(p_idx) * dt;
+                auto k3_position = (initial_velocity + k2_velocity / 2.0) * dt;
+                auto k3_entropy = particles.d_entropy(p_idx) * dt;
+
+                // Fourth step of Runge-Kutta
+                auto k4_velocity = particles.accel(p_idx) * dt;
+                auto k4_position = (initial_velocity + k3_velocity) * dt;
+                auto k4_entropy = particles.d_entropy(p_idx) * dt;
+
+                // Update velocity
+                particles.velocity(p_idx) = initial_velocity + (k1_velocity + 2.0 * k2_velocity + 2.0 * k3_velocity + k4_velocity) / 6.0;
 
                 // Update position
-                particles.position(p_idx) += particles.velocity(p_idx) * dt;
+                particles.position(p_idx) = initial_position + (k1_position + 2.0 * k2_position + 2.0 * k3_position + k4_position) / 6.0;
 
-                particles.energy_density(p_idx) += particles.d_energy_density(p_idx) * dt;
+                // Update entropy
+                particles.entropy(p_idx) = initial_entropy + (k1_entropy + 2.0 * k2_entropy + 2.0 * k3_entropy + k4_entropy) / 6.0;
+
 
                 // Reflective boundary conditions
                 for(unsigned int i = 0; i < Dim; ++i) {
@@ -219,10 +290,11 @@ public:
                         // Reverse the speed in the respective direction
                         particles.velocity(p_idx)[i] *= -1.0;
                     }
-                }
+                }     
 
-                // Update velocity with the other half of the acceleration
-                particles.velocity(p_idx) += particles.accel(p_idx) * dt / 2.;
+
+
+
             }
 
 
@@ -236,5 +308,51 @@ public:
         *
         * @param nt The number of time steps to run the simulation.
         */
-};
 
+       double density_arbitrary_pos(const ippl::Vector<double, Dim> pos) const
+       {
+            CubicSplineKernel<double, Dim> W;
+            double density_final = 0.0;
+            for (int i = 0; i < particles.position.size(); i++)
+            {
+                ippl::Vector<double,Dim> r_vec= pos - particles.position(i);
+                double r = std::sqrt(r_vec.dot(r_vec));
+
+                density_final = density_final + particles.mass(i)*W(r, h);
+            }
+            return density_final;
+       }
+
+       double pressure_arbitrary_pos(const ippl::Vector<double, Dim> pos) const
+       {
+            CubicSplineKernel<double, Dim> W;
+            double pressure_final = 0;
+            for (int i = 0; i < particles.position.size(); i++)
+            {
+                ippl::Vector<double,Dim> r_vec= pos - particles.position(i);
+                double r = std::sqrt(r_vec.dot(r_vec));
+               double volume_element = particles.mass(i)/(particles.density(i)+eps);
+
+                pressure_final = pressure_final + particles.pressure(i)*W(r, h)*volume_element;
+            }
+            return pressure_final;
+       }
+
+       double velocity_arbitrary_pos(const ippl::Vector<double, Dim> pos) const
+       {
+            CubicSplineKernel<double, Dim> W;
+            double velocity_final = 0.0;
+            for (int i = 0; i < particles.position.size(); i++)
+            {
+                ippl::Vector<double,Dim> r_vec= pos - particles.position(i);
+                double r = std::sqrt(r_vec.dot(r_vec));
+                double volume_element = particles.mass(i)/(particles.density(i)+eps);
+
+                velocity_final = velocity_final + particles.velocity(i)[0]*W(r, h)*volume_element;
+            }
+            return velocity_final;
+       }
+
+
+
+};
