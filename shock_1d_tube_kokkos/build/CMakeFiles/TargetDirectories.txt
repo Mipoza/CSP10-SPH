@@ -1,0 +1,4 @@
+/home/me/Documents/CSP/shock_1d_tube_kokkos/build/CMakeFiles/hello.dir
+/home/me/Documents/CSP/shock_1d_tube_kokkos/build/CMakeFiles/test.dir
+/home/me/Documents/CSP/shock_1d_tube_kokkos/build/CMakeFiles/edit_cache.dir
+/home/me/Documents/CSP/shock_1d_tube_kokkos/build/CMakeFiles/rebuild_cache.dir
