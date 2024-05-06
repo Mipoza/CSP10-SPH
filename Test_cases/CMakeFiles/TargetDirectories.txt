@@ -1,0 +1,3 @@
+/cluster/home/atamargo/repeat_ippl_2/SHP_kokkos/CMakeFiles/myprogram_IPPL_TRY.dir
+/cluster/home/atamargo/repeat_ippl_2/SHP_kokkos/CMakeFiles/edit_cache.dir
+/cluster/home/atamargo/repeat_ippl_2/SHP_kokkos/CMakeFiles/rebuild_cache.dir
