@@ -20,7 +20,7 @@
 #include "../include/Particle/ParticleBC.h"
 
 #include "../include/Manager/BaseManager.h"
-#include "SPHParticle_radovan.hpp"
+#include "SPH_Particle.hpp"
 
 
 using namespace ippl;

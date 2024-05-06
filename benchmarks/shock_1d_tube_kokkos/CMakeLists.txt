@@ -1,18 +1,19 @@
-project(SPH_IPPL CXX)
+project(HelloIPPL CXX)
 
-add_compile_options(-fopenmp -Ofast)
+add_compile_options(-O3)
+
 set (CMAKE_CXX_STANDARD 20)
-
+add_compile_options (-Wno-deprecated-declarations -w)
 # Include directories
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../include)
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../Kokkos/Kokkos_serial/include/)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../../../include)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../../../Kokkos/Kokkos_serial/include/)
 
 # Finding libraries
-file(GLOB KOKOS_LIB ${CMAKE_CURRENT_SOURCE_DIR}/../Kokkos/Kokkos_serial/lib/*.a)
-link_directories(ippl ${CMAKE_CURRENT_SOURCE_DIR}/../lib)
+file(GLOB KOKOS_LIB ${CMAKE_CURRENT_SOURCE_DIR}/../../../Kokkos/Kokkos_serial/lib/*.a)
+link_directories(ippl ${CMAKE_CURRENT_SOURCE_DIR}/../../../lib)
 
 # Executable
-add_executable(hello SPH_Manager.cpp)
+add_executable(shock_tube_1d shock_tube_1d.cpp)
 
 # Find required packages
 find_package(OpenMP REQUIRED)
@@ -29,9 +30,21 @@ endforeach()
 # Linking libraries
 target_link_libraries(hello 
     OpenMP::OpenMP_CXX 
+    ${KOKOS_LIB}
     MPI::MPI_CXX 
     ippl 
+    sfml-system 
+    sfml-window 
+    sfml-graphics 
+    sfml-network 
+    sfml-audio
+)
+
+target_link_libraries(test 
+    OpenMP::OpenMP_CXX 
     ${KOKOS_LIB}
+    MPI::MPI_CXX 
+    ippl 
     sfml-system 
     sfml-window 
     sfml-graphics 
