@@ -56,6 +56,7 @@ struct CubicSplineKernel{
 };
 
 
+
 /* Particle class for SPH with nearest neighbor search and 
  * smoothening. */
 template <typename T, unsigned DIM, class KERNEL = CubicSplineKernel<T, DIM>>
@@ -100,7 +101,7 @@ struct SPHParticle: public ippl::ParticleBase<ippl::ParticleSpatialLayout<T, DIM
   }
 
   void updateNeighbors(){
-    CMHelper.partition(position);
+    /*CMHelper.partition(position);
     // Sort for data locality
     CMHelper.sort(position.getView(), density.getView());
     CMHelper.sort(position.getView(), pressure.getView());
@@ -108,7 +109,7 @@ struct SPHParticle: public ippl::ParticleBase<ippl::ParticleSpatialLayout<T, DIM
     CMHelper.sort(position.getView(), d_entropy.getView());
     CMHelper.sort(position.getView(), velocity.getView());
     CMHelper.sort(position.getView(), accel.getView());
-    CMHelper.sort(position.getView(), position.getView());
+    CMHelper.sort(position.getView(), position.getView());*/
     
   }
 

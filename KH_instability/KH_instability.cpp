@@ -32,39 +32,6 @@ using namespace ippl;
 using namespace std;
 
 
-// Function to generate a random direction for 2D velocities
-void randomDirection(double& vx, double& vy) {
-    // Random number generator
-    std::random_device rd;
-    std::mt19937 gen(rd());
-    std::uniform_real_distribution<double> distribution(0.0, 2 * M_PI);
-
-    // Generate random angle
-    double angle = distribution(gen);
-
-    // Calculate components
-    vx = std::cos(angle);
-    vy = std::sin(angle);
-}
-
-double maxwellBoltzmann(double temperature, double mass) {
-    // Boltzmann constant (in SI units)
-    constexpr double kB = 1;
-
-    // Random number generator
-    std::random_device rd;
-    std::mt19937 gen(rd());
-    std::uniform_real_distribution<double> distribution(0.0, 1.0);
-
-    // Generate uniform random number
-    double u = distribution(gen);
-
-    // Compute inverse CDF of Maxwell-Boltzmann distribution
-    double v = std::sqrt(-2 * kB * temperature / mass * std::log(u));
-
-    return v;
-}
-
 // Call this function once at the beginning of your program
 void initialize_random_number_generator() {
     srand((unsigned) time(NULL));
@@ -104,8 +71,8 @@ int main(int argc, char* argv[]) {
 
  		ParticleSpatialLayout<double, dim> myparticlelayout(layout, mesh);
 
-		double h = 1.0;
-        double dt = 1.0*1e-2;
+		double h = 0.027;
+        double dt = 0.25*1e-3;
 
         Manager<dim> manager(myparticlelayout, origin, extent, dt, h, 1.4);
         std::vector<Vector<double, dim>> R_part_0;
@@ -114,25 +81,24 @@ int main(int argc, char* argv[]) {
         std::vector<double> E_part_0;
         std::vector<double> entropy_part_0;
 
-    // //Initializing random particle positions and velocities within Manager object
+        //Initializing random particle positions and velocities within Manager object
 
 
         std::random_device rd_2;  // Non-deterministic random number generator
         std::mt19937 gen_2(rd_2()); // Mersenne Twister pseudo-random generator, seeded with rd()
         std::uniform_real_distribution<> dist_2(0.0, 1.0); // Uniform distribution between 0 and 1
-        unsigned N_particles = 3250;
+        unsigned N_particles = 1000;
         double box_width = 1.0;
         double box_height = 1.0;
-        double density_1 = 1.0; // Density of the top layer
-        double density_2 = 1.0; // Density of the bottom layer
+        double density_1 = 0.01; // Density of the top layer
+        double density_2 = 10.0; // Density of the bottom layer
         double velocity_1 = 1.0; // Velocity of the top layer
         double velocity_2 = -1.0; // Velocity of the bottom layer
 
         // Example mass per particle assuming equal distribution initially
         double mass_1 = (density_1 * box_width * box_height / 2.0) / (N_particles / 2.0);
         double mass_2 = (density_2 * box_width * box_height / 2.0) / (N_particles / 2.0);
-
-
+ 
         unsigned N_side = static_cast<unsigned>(std::sqrt(N_particles / 2.0));
         dx = box_width / N_side;
         double dy = (box_height / 2.0) / N_side;
@@ -164,32 +130,7 @@ int main(int argc, char* argv[]) {
 
         const bool visc = true;
         manager.pre_run(R_part_0, v_part_0, E_part_0, m_part_0, entropy_part_0, bcs);
-		//manager.pre_step(visc);
 
-
-        // std::vector<double> position;
-        // std::vector<double> pressure;
-        // for (unsigned int i = 0; i < 50; i++)
-        // {
-        //     position.push_back(i*0.019);
-        //     pressure.push_back(manager.pressure_arbitrary_pos(i*0.019));
-        // }
-
-        // std::ofstream file_p("pressures_pos_new.dat");
-
-        // // Write the current time and positions to the file
-        // for (unsigned int j = 0; j < position.size(); j++)
-        // {
-        //     file_p  << ' ' << position[j] << ' ' << pressure[j] << '\n';
-        // }
-
-	    // file_p.close();
-
-
-        std::vector<double> position;
-        std::vector<double> pressure;
-        std::vector<double> density;
-        std::vector<double> velocity;
 
 		const unsigned int N_times = 10000;
 		//integration loop of the time eovlution
@@ -202,19 +143,21 @@ int main(int argc, char* argv[]) {
 			float maxRho = manager.particles.density(0);
 
 			for(int k = 0; k < manager.particles.density.size(); k++){
+                //if(i==1)
+                //    std::cout << manager.particles.density(k) << std::endl;
 				if(minRho > manager.particles.density(k))
 					minRho = manager.particles.density(k);
 				if(maxRho < manager.particles.density(k))
 					maxRho = manager.particles.density(k);
 			}
 			auto pos = manager.particles.position;
+            if(i==1)
+                std::cout << minRho << " " << maxRho << std::endl;
 			for (int j = 0; j < pos.size(); j++) {
 				sf::CircleShape circle(4.0f);   
 
 				float t = (manager.particles.density(j) - minRho) / ((maxRho - minRho + 0.001));
-				//cout << manager.particles.position(j)[1] << endl;
 				sf::Color color(static_cast<sf::Uint8>(255 * t), 0, static_cast<sf::Uint8>(255 * (1-t)));
-				//sf::Color color(0,0,255);
 				circle.setFillColor(color);
 
 				circle.setPosition(pos(j)[0]*width,pos(j)[1]*height); 
@@ -223,35 +166,10 @@ int main(int argc, char* argv[]) {
 			window.display();
 
 			manager.pre_step(visc);
-			// manager.pre_step(visc);
-            //cout << "density " << manager.particles.density(200) << endl;
-            // cout << "energy_density " << manager.particles.energy_density(200) << endl;
-            // cout << "entropy " << manager.particles.entropy(200) << endl;
-            // cout << "d_entropy " << manager.particles.d_entropy(200) << endl;
-			// cout << "pressure " << manager.particles.pressure(200) << endl;
-            // cout << "accel " << manager.particles.accel(200) << endl;
-
             manager.advance();
         }
 
-        // std::vector<double> position;
-        // std::vector<double> pressure;
-        // for (unsigned int i = 0; i < 500; i++)
-        // {
-        //     position.push_back(i*0.019);
-        //     pressure.push_back(manager.pressure_arbitrary_pos(i*0.019));
-        // }
-
-        // std::ofstream file_p("pressures_pos.dat");
-
-        // // Write the current time and positions to the file
-        // for (unsigned int j = 0; j < position.size(); j++)
-        // {
-        //     file_p  << ' ' << position[j] << ' ' << pressure[j] << '\n';
-        // }
-
-	    // file_p.close();
-
+       
 
 
   }

@@ -27,7 +27,7 @@
 using namespace ippl;
 using namespace std;
 
-#define eps 1e-3
+#define eps 1e-2
 
 
 template <unsigned int dim>
@@ -119,22 +119,18 @@ public:
                 // Reset 
                 particles.density(p_idx) = 0.0;
                 // Loop over neighbor cells
-                for(std::size_t n_cell_idx = 0;
-                    n_cell_idx < my_neighbor_cells.size();
-                    ++n_cell_idx){
                   // Loop over particles in neighbor cells
-                  const std::size_t start_idx_base = 
-                    particles.CMHelper.start_idx(my_neighbor_cells[n_cell_idx]);
+                  
                   for(std::size_t other_idx_ = 0;
-                      other_idx_ < particles.CMHelper.cell_size(my_neighbor_cells[n_cell_idx]);
+                      other_idx_ < N_particles;
                       ++other_idx_){
-                    const std::size_t other_idx = start_idx_base + other_idx_;
+                    const std::size_t other_idx =   other_idx_;
                     const auto& other_pos = particles.position(other_idx);
                     ippl::Vector<double, Dim> d =  other_pos - particles.position(p_idx);
                     double rij = std::sqrt(d.dot(d));
                     particles.density(p_idx) = particles.density(p_idx) + particles.mass(other_idx)*W(rij, h);
                   }
-                }
+                
                 particles.pressure(p_idx) = particles.entropy(p_idx)*
                   pow(particles.density(p_idx), Adiabatic_index);
 
