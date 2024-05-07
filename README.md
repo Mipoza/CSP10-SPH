@@ -1,7 +1,7 @@
 # Smoothed Particle Hydrodynamics with IPPL
 
 ## Project Branches
-We used several branches to work on the project more comfortably, but it is in the `main` branch where the final codes are located. In particular, we created four branches for each contributor as follows:
+We used several branches to work on the project more comfortably, but it is in the `main` branch where the final codes are located within the test folder. The `Test_cases` folder are old codes and are not intended to be used. In particular, we created four branches for each contributor as follows:
 
 - `atamargo`: Andres Tamargo. Github alias: andrest2000
 - `rdabetic`: Radovan Dabeti\'c. Github alias: Rado
@@ -24,7 +24,7 @@ It's important to note that we all helped each other and worked together as a te
 I was in charge of handling the nearest-neighbor problem. I wrote several versions using the standard library and tried using Kokkos in the latest version, however, we have discovered some bugs in the that one. Other than that, I contributed by debugging in general.
 
 ### Andrés
-I wrote the Manager class and also wrote the 1D Sod Shock tube test code and analyse the results. I also contributed with debugging in general in all codes.
+I wrote the `Manager.h` class and also wrote the 1D Sod Shock tube test code and analyse the results. I also contributed with debugging in general in all codes.
 
 ### Vincent
 First, I wrote the prototype of our SPH implementation in native C++ (available in `vincent/vanilla_sph`), then I implemented the boundary conditions and the particle drawing. I also wrote the Kelvin-Helmholtz instability test. More broadly, I did a lot of testing and debugging, especially in `Manager.h` and `SPHParticle_radovan.hpp`.
