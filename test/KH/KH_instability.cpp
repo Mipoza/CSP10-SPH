@@ -81,9 +81,6 @@ int main(int argc, char* argv[]) {
         std::vector<double> E_part_0;
         std::vector<double> entropy_part_0;
 
-        //Initializing random particle positions and velocities within Manager object
-
-
         std::random_device rd_2;  // Non-deterministic random number generator
         std::mt19937 gen_2(rd_2()); // Mersenne Twister pseudo-random generator, seeded with rd()
         std::uniform_real_distribution<> dist_2(0.0, 1.0); // Uniform distribution between 0 and 1
@@ -169,8 +166,6 @@ int main(int argc, char* argv[]) {
 			manager.pre_step(visc);
             manager.advance();
         }
-
-       
 
 
   }

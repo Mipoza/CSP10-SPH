@@ -57,7 +57,8 @@ struct CubicSplineKernel{
 
 
 
-/* Particle class for SPH with nearest neighbor search*/
+/* Particle class for SPH with nearest neighbor search and 
+ * smoothening. */
 template <typename T, unsigned DIM, class KERNEL = CubicSplineKernel<T, DIM>>
 struct SPHParticle: public ippl::ParticleBase<ippl::ParticleSpatialLayout<T, DIM>>{
   typedef ippl::ParticleSpatialLayout<T, DIM> PLayout_t;
@@ -69,6 +70,7 @@ struct SPHParticle: public ippl::ParticleBase<ippl::ParticleSpatialLayout<T, DIM
     gamm = 1.4;
   // The kernel itself
   KERNEL K;
+  
   // Helper for nearest neighbors
   ChainingMeshHelper<T, DIM, false> CMHelper;
 
@@ -92,8 +94,8 @@ struct SPHParticle: public ippl::ParticleBase<ippl::ParticleSpatialLayout<T, DIM
     this->addAttribute(pressure);
     this->addAttribute(position);
     this->addAttribute(velocity);
-    this->addAttribute(energy_density);
-    this->addAttribute(d_energy_density);
+     this->addAttribute(energy_density);
+     this->addAttribute(d_energy_density);
     this->addAttribute(accel);
     this->addAttribute(entropy);
     this->addAttribute(d_entropy);
@@ -102,8 +104,6 @@ struct SPHParticle: public ippl::ParticleBase<ippl::ParticleSpatialLayout<T, DIM
   void updateNeighbors(){
     CMHelper.clear();
     CMHelper.add_particles(position);
-
-    //Below is related to the improved version of the chaining mesh which is not yet implemented
     /*CMHelper.partition(position);
     // Sort for data locality
     CMHelper.sort(position.getView(), density.getView());
@@ -115,4 +115,63 @@ struct SPHParticle: public ippl::ParticleBase<ippl::ParticleSpatialLayout<T, DIM
     CMHelper.sort(position.getView(), position.getView());*/
     
   }
+
+  // inline T viscositySwitch(const std::size_t& i, const std::size_t& j,
+  //     const T& rij, const ippl::Vector<T, DIM>& ri, const ippl::Vector<T, DIM>& rj){
+  //   T Pij = 0;
+
+  //   ippl::Vector<T, DIM> rij = ri - rj; 
+  //   ippl::Vector<T, DIM> vij = velocity(i) - velocity(j); 
+  //   const T dot_product = rij.dot(vij);
+
+  //   if(dot_product >= 0)
+  //     return Pij;
+  //   // Else continue computation
+  //   const T rho_ij_bar = (pressure(i) + pressure(j))/2.;
+  //   const T c_ij_bar = (std::sqrt(gamm*pressure(i)/density(i))
+  //       + std::sqrt(gamm*pressure(j)/density(j)))/2.;
+
+  //   const T mu_ij = kernel_size*dot_product/(rij*rij + eps*kernel_size*kernel_size);
+
+  //   Pij = (-alpha*c_ij_bar*mu_ij + beta*mu_ij*mu_ij)/rho_ij_bar;
+  //   return Pij;
+  // }
+
+  // Find nearest neighbors and smoothen
+  // quantities of interest
+  void smoothen(){
+    updateNeighbors();
+    // Potential form of this function
+
+    const std::size_t N_particles = position.size();
+    // TODO: Kokkos here?
+    // for(std::size_t p_idx = 0; p_idx < N_particles; ++p_idx){
+    //   auto nn = CMHelper.neighbors(position(p_idx));
+    //   const auto& this_pos = position(p_idx);
+    //   // Term constant for this particle
+    //   const T p_idx_constant = pressure(p_idx)/(density(p_idx)*density(p_idx));
+    //   for(auto p_it = nn.begin(); p_it != nn.end(); ++p_it){
+    //     const auto& other_pos = position(*p_it);
+    //     ippl::Vector<T, DIM> d = (this_pos - other_pos);
+
+    //     const T rij_m = std::sqrt(d.dot(d));
+
+    //     // TODO: Complete (with viscosity switch etc)
+    //     accel(p_idx) -= 
+    //       mass(*p_it)*
+    //       (
+    //         p_idx_constant 
+    //         + pressure(*p_it)/(density(*p_it)*density(*p_it))
+    //         + viscositySwitch(p_idx, *p_it, rij_m)
+    //       )
+    //       *K.grad_r(rij_m, kernel_size);
+    //   }
+    // }
+
+  }
+
+  void set_bd(){
+    // TODO
+  }
+
 };
