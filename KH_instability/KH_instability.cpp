@@ -95,6 +95,7 @@ int main(int argc, char* argv[]) {
  		// all parallel layout, standard domain, normal axis order
  		FieldLayout<dim> layout(MPI_COMM_WORLD, owned, isParallel);	
  		double dx = 1.0 / 8.0;
+        //D
 
  		Vector<double,dim> hx = {dx, dx};
  		Vector<double,dim> origin = {-10.0, -10.0};
@@ -103,8 +104,8 @@ int main(int argc, char* argv[]) {
 
  		ParticleSpatialLayout<double, dim> myparticlelayout(layout, mesh);
 
-		double h = 0.0275;
-        double dt = 0.3*1e-2;
+		double h = 1.0;
+        double dt = 1.0*1e-2;
 
         Manager<dim> manager(myparticlelayout, origin, extent, dt, h, 1.4);
         std::vector<Vector<double, dim>> R_part_0;
@@ -119,7 +120,7 @@ int main(int argc, char* argv[]) {
         std::random_device rd_2;  // Non-deterministic random number generator
         std::mt19937 gen_2(rd_2()); // Mersenne Twister pseudo-random generator, seeded with rd()
         std::uniform_real_distribution<> dist_2(0.0, 1.0); // Uniform distribution between 0 and 1
-        unsigned N_particles = 10000;
+        unsigned N_particles = 3250;
         double box_width = 1.0;
         double box_height = 1.0;
         double density_1 = 1.0; // Density of the top layer
@@ -190,7 +191,7 @@ int main(int argc, char* argv[]) {
         std::vector<double> density;
         std::vector<double> velocity;
 
-		const unsigned int N_times = 1000;
+		const unsigned int N_times = 10000;
 		//integration loop of the time eovlution
 
 		for (unsigned int i = 0; i < N_times; i++)

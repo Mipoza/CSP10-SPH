@@ -27,7 +27,7 @@
 using namespace ippl;
 using namespace std;
 
-#define eps 1e-4
+#define eps 1e-3
 
 
 template <unsigned int dim>
@@ -169,7 +169,7 @@ public:
                         const auto& other_vel = particles.velocity(other_idx);
                         ippl::Vector<double, Dim> d =  other_pos - particles.position(p_idx);
                         ippl::Vector<double, Dim> vel =  other_vel - particles.velocity(p_idx);
-                        double rij = std::sqrt(d.dot(d));
+                        double rij = std::sqrt(d.dot(d)) + eps;
                         double vij = std::sqrt(vel.dot(vel));
 
                         if (viscous) 
@@ -179,7 +179,7 @@ public:
                             double aux_1 = (((particles.pressure(p_idx)/pow(particles.density(p_idx) + eps,2))));
 
                             particles.accel(p_idx) = particles.accel(p_idx) -
-                                (-((d)*W.grad_r(rij, h))/(rij + eps))*(particles.mass(other_idx))*aux;
+                                (-((d)*W.grad_r(rij, h))/(rij ))*(particles.mass(other_idx))*aux;
                             double density_mean = (particles.density(other_idx) + particles.density(p_idx))/2;
 
                             // Mean sound velocity
@@ -190,7 +190,7 @@ public:
 
 
                             particles.accel(p_idx) = particles.accel(p_idx) -
-                              particles.mass(other_idx)*(-((d)*W.grad_r(rij, h))/(rij + eps))*visc(c_ij_bar, density_mean, d, vel, h);
+                              particles.mass(other_idx)*(-((d)*W.grad_r(rij, h))/(rij ))*visc(c_ij_bar, density_mean, d, vel, h);
 
                             //particles.d_energy_density(p_idx) = particles.d_energy_density(p_idx) + (aux_1*particles.mass(*p_it)*vel.dot((-(d)*W.grad_r(rij, h))/(rij + eps)))
                             //  + (0.5*particles.mass(*p_it)*visc(0.1, density_mean, d, vel, h)*vel.dot((-(d)*W.grad_r(rij, h))/(rij + eps)));
@@ -202,7 +202,7 @@ public:
                             particles.d_entropy(p_idx) = particles.d_entropy(p_idx) + 
                             ((Adiabatic_index-1.0)/std::pow(particles.density(p_idx)+eps, Adiabatic_index -1.0))*
                             (0.5*particles.mass(other_idx)*
-                             visc(c_ij_bar, density_mean, d, vel, h)*vel.dot((-(d)*W.grad_r(rij, h))/(rij + eps)));
+                             visc(c_ij_bar, density_mean, d, vel, h)*vel.dot((-(d)*W.grad_r(rij, h))/(rij )));
 
                         } 
 
