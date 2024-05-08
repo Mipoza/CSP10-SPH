@@ -30,4 +30,4 @@ I wrote the `Manager.h` class and also wrote the 1D Sod Shock tube test code and
 First, I wrote the prototype of our SPH implementation in native C++ (available in `vincent/vanilla_sph`), then I implemented the boundary conditions and the particle drawing. I also wrote the Kelvin-Helmholtz instability test. More broadly, I did a lot of testing and debugging, especially in `Manager.h` and `SPHParticle_radovan.hpp`.
 
 ### Marc
-Add your contributions here...
+I wrote an initial version of the 1D Shock Tube test case and did general testing of the code.
