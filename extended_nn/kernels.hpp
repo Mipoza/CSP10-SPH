@@ -48,6 +48,20 @@ struct CubicSplineKernel{
         else
             return static_cast<T>(0);
     }
+
+    inline T grad_h(T r, T h) const { //for now : only dim 2
+        const T q = std::abs(r) / h;
+
+        T sigma = static_cast<T>(10.0 / (7 * M_PI * std::pow(h, 2)));
+
+
+        if (q >= 0 && q <= 1)
+            return -((2*sigma)/h) * (1 - 1.5 * std::pow(q, 2) * (1 - q / 2)) + (-q/h)*sigma*3/4 * q*(3*q - 4) ;
+        else if (q > 1 && q <= 2)
+            return -(sigma / (2*h)) * std::pow((2 - q), 3) + ((q*sigma) / (4*h)) * 3 * std::pow((2 - q), 2);
+        else
+            return static_cast<T>(0);
+    }
 };
 
 // TODO: Check if the formulae are correct

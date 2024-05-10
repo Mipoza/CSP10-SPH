@@ -1,6 +1,6 @@
 project(SPH CXX)
 
-add_compile_options(-Ofast -Wall)
+add_compile_options(-Wall)
 
 set (CMAKE_CXX_STANDARD 23)
 

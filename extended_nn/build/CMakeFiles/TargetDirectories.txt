@@ -1,3 +1,0 @@
-/home/rdabetic/Desktop/extended_nn/build/CMakeFiles/KHInstability.dir
-/home/rdabetic/Desktop/extended_nn/build/CMakeFiles/edit_cache.dir
-/home/rdabetic/Desktop/extended_nn/build/CMakeFiles/rebuild_cache.dir

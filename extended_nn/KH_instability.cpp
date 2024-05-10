@@ -71,7 +71,7 @@ int main(int argc, char* argv[]) {
 	Vec<T, DIM> extent = {1.0, 1.0};
 
 	T h = 0.05;
-  T dt = 4e-4;
+  T dt = 0.5*1e-2;
 
   constexpr static const bool periodic[2] = {true, true};
   constexpr bool visc = true;
@@ -87,7 +87,7 @@ int main(int argc, char* argv[]) {
   std::random_device rd_2;  // Non-deterministic random number generator
   std::mt19937 gen_2(rd_2()); // Mersenne Twister pseudo-random generator, seeded with rd()
   std::uniform_real_distribution<> dist_2(0.0, 1.0); // Uniform distribution between 0 and 1
-  unsigned N_particles = 10'000;
+  unsigned N_particles = 2000;
   const T box_width = 1.0;
   const T box_height = 1.0;
   const T density_ = 1.0;
@@ -162,6 +162,15 @@ int main(int argc, char* argv[]) {
 			circle.setPosition(pos(j)[0]*width, pos(j)[1]*height); 
 			window.draw(circle);
     }
+    std::cout << "pos :" << manager.position(500) << std::endl;
+    std::cout << "dens :" << manager.density(500) << std::endl;
+    std::cout << "pressure :" << manager.pressure(500) << std::endl;
+    std::cout << "entro :" << manager.entropy(500) << std::endl;
+    std::cout << "d_entropy :" << manager.d_entropy(500) << std::endl;
+    std::cout << "vel :" << manager.velocity(500) << std::endl;
+    std::cout << "accel :" << manager.accel(500) << std::endl;
+    std::cout << "h :" << manager.smoothing_kernel_sizes(500) << std::endl;
+
 		window.display();
 
     manager.step();

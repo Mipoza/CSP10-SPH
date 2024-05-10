@@ -44,7 +44,7 @@ struct SPHManager {
     ChainingMeshHelper<T, DIM, PERIODIC> CMHelper;
 
     // Physical quantities
-    Kokkos::View<T*> mass, density, pressure, entropy, d_entropy, smoothing_kernel_sizes;
+    Kokkos::View<T*> mass, density, pressure, entropy, d_entropy, smoothing_kernel_sizes, gradh;
     Kokkos::View<Vec<T, DIM>*> position, velocity, accel;
 
     SPHManager(Vec<T, DIM>& low, Vec<T, DIM>& extent, 
@@ -60,6 +60,8 @@ struct SPHManager {
       // Scalar quantities
       Kokkos::View<T*> mass_("Mass", N);
       mass = mass_;
+      Kokkos::View<T*> gradh_("gradh", N);
+      gradh = gradh_;
       Kokkos::View<T*> density_("Density", N);
       density = density_;
       Kokkos::View<T*> pressure_("Pressure", N);
@@ -87,6 +89,7 @@ struct SPHManager {
       CMHelper.partition(position);
       // Sort for data locality
       CMHelper.sort(position, mass);
+      CMHelper.sort(position, gradh);
       CMHelper.sort(position, smoothing_kernel_sizes);
       CMHelper.sort(position, density);
       CMHelper.sort(position, pressure);
@@ -127,7 +130,7 @@ struct SPHManager {
       Kokkos::deep_copy(entropy, entropy_host);
       // Set it to something
       if(mass_target_ == -1)
-        mass_target = 3*avg_m;
+        mass_target = avg_m;
     }
     
     KOKKOS_INLINE_FUNCTION
@@ -198,13 +201,47 @@ struct SPHManager {
           }
           // Solve equation to get to smoothing kernel size
           // T temp = secant(my_mass_func, h0, h1);
-          smoothing_kernel_sizes(p_idx) = secant(my_mass_func, h0, h1)*h;
+          smoothing_kernel_sizes(p_idx) = Kokkos::abs(secant(my_mass_func, h0, h1))*h +eps;
+          if(std::isnan(smoothing_kernel_sizes(p_idx)))
+            smoothing_kernel_sizes(p_idx) = 0.1;
           // std::cout << temp << std::endl;
           // Update pressure while we're at it (TODO: add grad_h)
           pressure(p_idx) = entropy(p_idx)*
             pow(density(p_idx), Adiabatic_index);
         }
       );
+
+      //compute gradh
+      Kokkos::parallel_for(N_particles, 
+        KOKKOS_LAMBDA (const std::size_t p_idx){
+          gradh(p_idx) = 0;
+
+          T aux_loop = 0;
+          auto key = CMHelper.cell_idx(position(p_idx));
+          const auto my_neighbor_cells = CMHelper.get_cell_neighbor_idx(key);
+          // Loop over neighbor cells
+          for(std::size_t n_cell_idx = 0;
+              n_cell_idx < my_neighbor_cells.size();
+              ++n_cell_idx){
+                // Loop over particles in neighbor cells
+                const std::size_t start_idx_base = 
+                CMHelper.start_idx(my_neighbor_cells[n_cell_idx]);
+                for(std::size_t other_idx_ = 0;
+                    other_idx_ < CMHelper.cell_size(my_neighbor_cells[n_cell_idx]);
+                    ++other_idx_){
+                  const std::size_t other_idx = start_idx_base + other_idx_;
+                  if(p_idx != other_idx){
+                      const auto& other_pos = position(other_idx);
+                      Vec<T, DIM> d = other_pos - position(p_idx);
+                      T rij = Kokkos::sqrt(d.dot(d));
+                      aux_loop += mass(other_idx)*K.grad_h(rij, smoothing_kernel_sizes(p_idx));
+
+                  }
+            }
+         }
+        
+         gradh(p_idx) = 1+0.5*Kokkos::sqrt(mass_target/Kokkos::abs(density(p_idx)*aux_loop)); 
+      });
 
       Kokkos::parallel_for(N_particles, 
         KOKKOS_LAMBDA (const std::size_t p_idx){
@@ -234,14 +271,13 @@ struct SPHManager {
                 T vij = Kokkos::sqrt(vel.dot(vel));
 
                 if constexpr (viscous) {
-                  T aux = ((pressure(other_idx)/pow(density(other_idx)
-                          + eps,2)) + 
-                      ((pressure(p_idx)/pow(density(p_idx) + eps,2))));
-                  T aux_1 = (((pressure(p_idx)/pow(density(p_idx) + eps,2))));
 
-                  accel(p_idx) -=
-                      (-((d)*K.grad_r(rij, h))/(rij + eps))*
-                      (mass(other_idx))*aux;
+                  T aux_1 = pressure(p_idx)/(pow(density(p_idx)+ eps,2) * gradh(p_idx));
+
+                  T aux_2 = pressure(other_idx)/(pow(density(other_idx)+ eps,2) * gradh(other_idx));
+
+                  accel(p_idx) -= mass(other_idx) * (aux_1 * (-((d)*K.grad_r(rij, smoothing_kernel_sizes(p_idx)))/(rij + eps)) +
+                   aux_2 * (-((d)*K.grad_r(rij, smoothing_kernel_sizes(other_idx)))/(rij + eps)));
                   T density_mean = (density(other_idx) + density(p_idx))/2;
 
                   // Mean sound velocity
@@ -250,18 +286,20 @@ struct SPHManager {
                       + Kokkos::sqrt(abs(Adiabatic_index*pressure(other_idx)/
                           (density(other_idx) + eps))))/2.;
 
+                  T mean_h = 0.5*(smoothing_kernel_sizes(p_idx) + smoothing_kernel_sizes(other_idx));
+                  Vec<T, DIM> sym_grad_W = 0.5 *( (-((d)*K.grad_r(rij, smoothing_kernel_sizes(p_idx)))/(rij + eps))
+                   + (-((d)*K.grad_r(rij, smoothing_kernel_sizes(other_idx)))/(rij + eps)));
+                  accel(p_idx) -= 
+                    mass(other_idx)*sym_grad_W*
+                      visc(c_ij_bar, density_mean, d, vel, mean_h);
 
-                  accel(p_idx) -=
-                    mass(other_idx)*(-((d)*K.grad_r(rij, h))/(rij + eps))*
-                      visc(c_ij_bar, density_mean, d, vel, h);
-
-
+                  //std::cout << visc(c_ij_bar, density_mean, d, vel, mean_h) << std::endl;
                   d_entropy(p_idx) += 
                   ((Adiabatic_index-1.0)/std::pow(density(p_idx)+eps,
                     Adiabatic_index -1.0))*
                   (0.5*mass(other_idx)*
-                   visc(c_ij_bar, density_mean, d, vel, h)*
-                    vel.dot((-(d)*K.grad_r(rij, h))/(rij + eps)));
+                   visc(c_ij_bar, density_mean, d, vel, mean_h)*
+                    vel.dot( sym_grad_W ));
 
                 } 
                 else {
