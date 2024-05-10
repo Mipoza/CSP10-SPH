@@ -1,3 +1,0 @@
-/home/rdabetic/Documents/IPPL/test_cases/sod/build/CMakeFiles/shock.dir
-/home/rdabetic/Documents/IPPL/test_cases/sod/build/CMakeFiles/edit_cache.dir
-/home/rdabetic/Documents/IPPL/test_cases/sod/build/CMakeFiles/rebuild_cache.dir

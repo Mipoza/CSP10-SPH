@@ -181,40 +181,23 @@ public:
         { 
             const std::size_t N_particles = particles.position.size();
 
+            Kokkos::View<ippl::Vector<double, Dim>*> x_n("x", N_particles);
+            Kokkos::View<ippl::Vector<double, Dim>*> v_n("v", N_particles);
+            Kokkos::View<double*> s_n("s", N_particles);
+
+            
             Kokkos::parallel_for(N_particles, 
-              KOKKOS_LAMBDA (const std::size_t p_idx){
+              KOKKOS_LAMBDA (const int p_idx){
+   
+                x_n(p_idx) = particles.position(p_idx);
+                v_n(p_idx) = particles.velocity(p_idx);
+                s_n(p_idx) = particles.entropy(p_idx);
 
-                // Update velocity with half of the acceleration
-                particles.velocity(p_idx) = particles.velocity(p_idx) + particles.accel(p_idx) * dt / 2.;
+                particles.position(p_idx) = x_n(p_idx) + (dt/2)*v_n(p_idx);
+                particles.velocity(p_idx) = v_n(p_idx) + (dt/2)*particles.accel(p_idx);
+                particles.entropy(p_idx) = s_n(p_idx) + (dt/2)*particles.d_entropy(p_idx);
 
-                // Update position
-                particles.position(p_idx) = particles.position(p_idx) + particles.velocity(p_idx) * dt;
 
-                // Update velocity with the other half of the acceleration
-                particles.velocity(p_idx) = particles.velocity(p_idx) + particles.accel(p_idx) * dt / 2.;
-
-                // Initial values
-                auto initial_entropy = particles.entropy(p_idx);
-                
-                // First step of Runge-Kutta
-                auto k1_entropy = particles.d_entropy(p_idx) * dt;
-
-                // Second step of Runge-Kutta
-                auto k2_entropy = particles.d_entropy(p_idx) * dt;
-
-                // Third step of Runge-Kutta
-                auto k3_entropy = particles.d_entropy(p_idx) * dt;
-
-                // Fourth step of Runge-Kutta
-                auto k4_entropy = particles.d_entropy(p_idx) * dt;
-
-                // Update entropy
-                particles.entropy(p_idx) = initial_entropy + (k1_entropy + 2.0 * k2_entropy + 2.0 * k3_entropy + k4_entropy) / 6.0;
-
-                // Boundary conditions for the the particular KH instability problem i.e. periodic in x and reflecting in y
-                //We expect to set the BC in a more efficient way in the future, but for now this is the way to do it
-
-                // Reflective boundary conditions
                 for(unsigned int i = 1; i < Dim; ++i) {
                     if(particles.position(p_idx)[i] < 0.01 || particles.position(p_idx)[i] > 0.99) {
                         // Reflect the position
@@ -224,7 +207,28 @@ public:
                         particles.velocity(p_idx)[i] *= -1.0;
                     }
                 }  
+            });
 
+            pre_step(true);
+
+            Kokkos::parallel_for(N_particles, 
+              KOKKOS_LAMBDA (const std::size_t p_idx){
+                
+                
+                particles.position(p_idx) = x_n(p_idx) + dt*particles.velocity(p_idx);
+                particles.velocity(p_idx) = v_n(p_idx) + dt*particles.accel(p_idx);
+                particles.entropy(p_idx) = s_n(p_idx) + dt*particles.d_entropy(p_idx);
+
+
+                for(unsigned int i = 1; i < Dim; ++i) {
+                    if(particles.position(p_idx)[i] < 0.01 || particles.position(p_idx)[i] > 0.99) {
+                        // Reflect the position
+                        particles.position(p_idx)[i] = std::max(0.01, std::min(0.99, particles.position(p_idx)[i])); // Clamp position to [0,1]
+
+                        // Reverse the speed in the respective direction
+                        particles.velocity(p_idx)[i] *= -1.0;
+                    }
+                }  
             });
         }
 
