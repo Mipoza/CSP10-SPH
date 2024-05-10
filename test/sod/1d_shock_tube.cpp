@@ -26,7 +26,7 @@
 #include "SPHParticle_radovan.hpp"
 #include "Manager.h"
 
-#include <SFML/Graphics.hpp>
+//#include <SFML/Graphics.hpp>
 
 using namespace ippl;
 using namespace std;
@@ -79,9 +79,9 @@ double rand_minus1_to_1() {
 
 
 int main(int argc, char* argv[]) {
-	int width = 800;
-	int height = 600;
-	sf::RenderWindow window(sf::VideoMode(width, height), "SPH Simulation");
+	// int width = 800;
+	// int height = 600;
+	// sf::RenderWindow window(sf::VideoMode(width, height), "SPH Simulation");
 	initialize(argc, argv);
 	{
 
@@ -103,7 +103,7 @@ int main(int argc, char* argv[]) {
 
  		ParticleSpatialLayout<double, 1> myparticlelayout(layout, mesh);
 
-		double h = 0.015;
+		double h = 0.05;
     double dt = 1e-3;
 
     Manager<1> manager(myparticlelayout, origin, extent, dt, h, 1.4);
@@ -128,7 +128,6 @@ int main(int argc, char* argv[]) {
         double v = maxwellBoltzmann(T, mass);
 
         R_part_0.push_back(Vector<double, 1>(origin[0] + extent[0]*i/((double)N_particles*fac) * 0.5));
-        cout << "particle_pos_left" << origin[0] + extent[0]*i/((double)N_particles*fac) * 0.5 << endl;
         v_part_0.push_back(Vector<double, 1>(v));
         m_part_0.push_back(mass);
         E_part_0.push_back(10.0);
@@ -146,7 +145,6 @@ int main(int argc, char* argv[]) {
         double x = dist_2(gen_2)/2.0;
         double v = maxwellBoltzmann(T2, mass);
         R_part_0.push_back(Vector<double, 1>(extent[0]*i/((double)N_particles) * 0.5));
-        cout << "particle_pos_right" << extent[0]*i/((double)N_particles) * 0.5 << endl;
         v_part_0.push_back(Vector<double, 1>(v));
         m_part_0.push_back(mass);
         E_part_0.push_back(10.0);
@@ -188,31 +186,31 @@ int main(int argc, char* argv[]) {
 
 		for (unsigned int i = 0; i < N_times; i++)
 		{
-			window.clear();
+		// 	window.clear();
 
-			float minRho = manager.particles.density(0);
-			float maxRho = manager.particles.density(0);
+		// 	float minRho = manager.particles.density(0);
+		// 	float maxRho = manager.particles.density(0);
 
-			for(int k = 0; k < manager.particles.density.size(); k++){
-				if(minRho > manager.particles.density(k))
-					minRho = manager.particles.density(k);
-				if(maxRho < manager.particles.density(k))
-					maxRho = manager.particles.density(k);
-			}
-			auto pos = manager.particles.position;
-			for (int j = 0; j < pos.size(); j++) {
-				sf::CircleShape circle(4.0f);   
+		// 	for(int k = 0; k < manager.particles.density.size(); k++){
+		// 		if(minRho > manager.particles.density(k))
+		// 			minRho = manager.particles.density(k);
+		// 		if(maxRho < manager.particles.density(k))
+		// 			maxRho = manager.particles.density(k);
+		// 	}
+		// 	auto pos = manager.particles.position;
+		// 	for (int j = 0; j < pos.size(); j++) {
+		// 		sf::CircleShape circle(4.0f);   
 
-				float t = (manager.particles.density(j) - minRho) / ((maxRho - minRho + 0.001));
-				//cout << manager.particles.position(j)[1] << endl;
-				sf::Color color(static_cast<sf::Uint8>(255 * t), 0, static_cast<sf::Uint8>(255 * (1-t)));
-				//sf::Color color(0,0,255);
-				circle.setFillColor(color);
+		// 		float t = (manager.particles.density(j) - minRho) / ((maxRho - minRho + 0.001));
+		// 		//cout << manager.particles.position(j)[1] << endl;
+		// 		sf::Color color(static_cast<sf::Uint8>(255 * t), 0, static_cast<sf::Uint8>(255 * (1-t)));
+		// 		//sf::Color color(0,0,255);
+		// 		circle.setFillColor(color);
 
-				circle.setPosition((10 + pos(j)[0])*width/20, 0.5*height); 
-				window.draw(circle);
-      }
-			window.display();
+		// 		circle.setPosition((10 + pos(j)[0])*width/20, 0.5*height); 
+		// 		window.draw(circle);
+    //   }
+		// 	window.display();
 
 			manager.pre_step(visc);
 			// manager.pre_step(visc);
@@ -224,10 +222,14 @@ int main(int argc, char* argv[]) {
             // cout << "accel " << manager.particles.accel(200) << endl;
         
 
-      std::vector<double>().swap(position);
-      std::vector<double>().swap(pressure);
-      std::vector<double>().swap(density);
-      std::vector<double>().swap(velocity);
+      // std::vector<double>().swap(position);
+      // std::vector<double>().swap(pressure);
+      // std::vector<double>().swap(density);
+      // std::vector<double>().swap(velocity);
+      position.clear();
+      pressure.clear();
+      density.clear();
+      velocity.clear();
 
       double x_length;
       for (unsigned int i = 0; i < 5000; i++)
@@ -242,13 +244,13 @@ int main(int argc, char* argv[]) {
 
       std::ofstream file_p, file_rho, file_v;
       if(visc){
-        file_p.open("../../pressures/pressures_pos_neww" + std::to_string(i) + ".dat");
-        file_rho.open("../../densities/densities_pos_neww" + std::to_string(i) + ".dat");
-        file_v.open("../../velocities/velocities_pos_neww" + std::to_string(i) + ".dat");
+        file_p.open("../pressures/pressures_pos_neww_f" + std::to_string(i) + ".dat");
+        file_rho.open("../densities/densities_pos_neww_f" + std::to_string(i) + ".dat");
+        file_v.open("../velocities/velocities_pos_neww_f" + std::to_string(i) + ".dat");
       } else{
-        file_p.open("../../pressures/pressures_pos_no_visc" + std::to_string(i) + ".dat");
-        file_rho.open("../../densities/densities_pos_no_visc" + std::to_string(i) + ".dat");
-        file_v.open("../../velocities/velocities_pos_no_visc" + std::to_string(i) + ".dat");
+        file_p.open("../pressures/pressures_pos_no_visc" + std::to_string(i) + ".dat");
+        file_rho.open("../densities/densities_pos_no_visc" + std::to_string(i) + ".dat");
+        file_v.open("../velocities/velocities_pos_no_visc" + std::to_string(i) + ".dat");
       }
 
       // Write the current time and positions to the file

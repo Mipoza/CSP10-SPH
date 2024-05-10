@@ -197,16 +197,19 @@ public:
                 particles.velocity(p_idx) = v_n(p_idx) + (dt/2)*particles.accel(p_idx);
                 particles.entropy(p_idx) = s_n(p_idx) + (dt/2)*particles.d_entropy(p_idx);
 
-
-                for(unsigned int i = 1; i < Dim; ++i) {
-                    if(particles.position(p_idx)[i] < 0.01 || particles.position(p_idx)[i] > 0.99) {
+                // Reflective boundary conditions
+                for(unsigned int i = 0; i < Dim; ++i) {
+                    if(particles.position(p_idx)[i] < low_[i] + eps ||
+                       particles.position(p_idx)[i] > low_[i] + L_[i] - eps) {
                         // Reflect the position
-                        particles.position(p_idx)[i] = std::max(0.01, std::min(0.99, particles.position(p_idx)[i])); // Clamp position to [0,1]
+                        particles.position(p_idx)[i] = std::max(low_[i] + eps, 
+                            std::min(low_[i] + L_[i] - eps, particles.position(p_idx)[i])); // Clamp position to [0,1]
 
                         // Reverse the speed in the respective direction
                         particles.velocity(p_idx)[i] *= -1.0;
                     }
-                }  
+                }     
+
             });
 
             pre_step(true);
@@ -220,15 +223,20 @@ public:
                 particles.entropy(p_idx) = s_n(p_idx) + dt*particles.d_entropy(p_idx);
 
 
-                for(unsigned int i = 1; i < Dim; ++i) {
-                    if(particles.position(p_idx)[i] < 0.01 || particles.position(p_idx)[i] > 0.99) {
+
+                // Reflective boundary conditions
+                for(unsigned int i = 0; i < Dim; ++i) {
+                    if(particles.position(p_idx)[i] < low_[i] + eps ||
+                       particles.position(p_idx)[i] > low_[i] + L_[i] - eps) {
                         // Reflect the position
-                        particles.position(p_idx)[i] = std::max(0.01, std::min(0.99, particles.position(p_idx)[i])); // Clamp position to [0,1]
+                        particles.position(p_idx)[i] = std::max(low_[i] + eps, 
+                            std::min(low_[i] + L_[i] - eps, particles.position(p_idx)[i])); // Clamp position to [0,1]
 
                         // Reverse the speed in the respective direction
                         particles.velocity(p_idx)[i] *= -1.0;
                     }
-                }  
+                }     
+
             });
         }
 
