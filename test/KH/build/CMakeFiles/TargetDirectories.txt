@@ -1,3 +1,0 @@
-/home/rdabetic/Documents/IPPL/test_cases/KH/build/CMakeFiles/KH.dir
-/home/rdabetic/Documents/IPPL/test_cases/KH/build/CMakeFiles/edit_cache.dir
-/home/rdabetic/Documents/IPPL/test_cases/KH/build/CMakeFiles/rebuild_cache.dir
