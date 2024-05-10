@@ -96,7 +96,7 @@ int main(int argc, char* argv[]) {
 
   // Example mass per particle assuming equal distribution initially
   T mass = (density_ * box_width * box_height) / (N_particles / 2.0);
-
+  
 
   unsigned N_side = static_cast<unsigned>(std::sqrt(N_particles / 2.0));
   T dx = box_width / N_side;
@@ -162,14 +162,19 @@ int main(int argc, char* argv[]) {
 			circle.setPosition(pos(j)[0]*width, pos(j)[1]*height); 
 			window.draw(circle);
     }
-    std::cout << "pos :" << manager.position(500) << std::endl;
+    /*std::cout << "pos :" << manager.position(500) << std::endl;
     std::cout << "dens :" << manager.density(500) << std::endl;
     std::cout << "pressure :" << manager.pressure(500) << std::endl;
     std::cout << "entro :" << manager.entropy(500) << std::endl;
     std::cout << "d_entropy :" << manager.d_entropy(500) << std::endl;
     std::cout << "vel :" << manager.velocity(500) << std::endl;
     std::cout << "accel :" << manager.accel(500) << std::endl;
-    std::cout << "h :" << manager.smoothing_kernel_sizes(500) << std::endl;
+    std::cout << "h :" << manager.smoothing_kernel_sizes(500) << std::endl;*/
+    if(std::isnan(manager.density(i)) || std::isnan(manager.pressure(i))
+    || std::isnan(manager.accel(i)[0]) ||std::isnan(manager.accel(i)[1]) ){
+    std::cout <<"ffffff" <<std::endl;
+  }
+    
 
 		window.display();
 

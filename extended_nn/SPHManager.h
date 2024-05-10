@@ -142,6 +142,7 @@ struct SPHManager {
       const auto my_neighbor_cells = CMHelper.get_cell_neighbor_idx(key, r);
       // Reset 
       density(p_idx) = 0.0;
+      
       // Loop over neighbor cells
       for(std::size_t n_cell_idx = 0;
           n_cell_idx < my_neighbor_cells.size();
@@ -202,8 +203,11 @@ struct SPHManager {
           // Solve equation to get to smoothing kernel size
           // T temp = secant(my_mass_func, h0, h1);
           smoothing_kernel_sizes(p_idx) = Kokkos::abs(secant(my_mass_func, h0, h1))*h +eps;
-          if(std::isnan(smoothing_kernel_sizes(p_idx)))
-            smoothing_kernel_sizes(p_idx) = 0.1;
+          smoothing_kernel_sizes(p_idx) = h;
+          if(smoothing_kernel_sizes(p_idx) != smoothing_kernel_sizes(p_idx)){
+            smoothing_kernel_sizes(p_idx) = h;
+
+          }
           // std::cout << temp << std::endl;
           // Update pressure while we're at it (TODO: add grad_h)
           pressure(p_idx) = entropy(p_idx)*
@@ -239,8 +243,13 @@ struct SPHManager {
                   }
             }
          }
-        
-         gradh(p_idx) = 1+0.5*Kokkos::sqrt(mass_target/Kokkos::abs(density(p_idx)*aux_loop)); 
+         
+         gradh(p_idx) = 1.0+(1.0/DIM)*(smoothing_kernel_sizes(p_idx)/density(p_idx)) * aux_loop ; 
+         if(gradh(p_idx) < 0.1){
+         //std::cout << density(p_idx) << std::endl;
+         gradh(p_idx) = 1.0;
+         }
+         
       });
 
       Kokkos::parallel_for(N_particles, 
@@ -289,7 +298,7 @@ struct SPHManager {
                   T mean_h = 0.5*(smoothing_kernel_sizes(p_idx) + smoothing_kernel_sizes(other_idx));
                   Vec<T, DIM> sym_grad_W = 0.5 *( (-((d)*K.grad_r(rij, smoothing_kernel_sizes(p_idx)))/(rij + eps))
                    + (-((d)*K.grad_r(rij, smoothing_kernel_sizes(other_idx)))/(rij + eps)));
-                  accel(p_idx) -= 
+                  /*accel(p_idx) -= 
                     mass(other_idx)*sym_grad_W*
                       visc(c_ij_bar, density_mean, d, vel, mean_h);
 
@@ -299,7 +308,7 @@ struct SPHManager {
                     Adiabatic_index -1.0))*
                   (0.5*mass(other_idx)*
                    visc(c_ij_bar, density_mean, d, vel, mean_h)*
-                    vel.dot( sym_grad_W ));
+                    vel.dot( sym_grad_W ));*/
 
                 } 
                 else {
