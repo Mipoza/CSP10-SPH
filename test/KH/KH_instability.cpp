@@ -5,24 +5,24 @@
 #include <ctime>
 #include <random>
 
-#include "../../include/Ippl.h"
+#include "../include/Ippl.h"
 
-#include "../../include/Expression/IpplExpressions.h" 
+#include "../include/Expression/IpplExpressions.h" 
 //#include "../../include/Expression/IpplOperators.h" 
 
-#include "../../include/Types/Vector.h"
-#include "../../include/Particle/ParticleLayout.h"
-#include "../../include/Particle/ParticleSpatialLayout.h"
-#include "../../include/Particle/ParticleBase.h"
-#include "../../include/Particle/ParticleAttribBase.h"
-#include "../../include/Particle/ParticleAttrib.h"
-#include "../../include/FieldLayout/FieldLayout.h"
-#include "../../include/Field/Field.h"
-#include "../../include/Field/BareField.h"
-#include "../../include/Meshes/CartesianCentering.h"
-#include "../../include/Particle/ParticleBC.h"
+#include "../include/Types/Vector.h"
+#include "../include/Particle/ParticleLayout.h"
+#include "../include/Particle/ParticleSpatialLayout.h"
+#include "../include/Particle/ParticleBase.h"
+#include "../include/Particle/ParticleAttribBase.h"
+#include "../include/Particle/ParticleAttrib.h"
+#include "../include/FieldLayout/FieldLayout.h"
+#include "../include/Field/Field.h"
+#include "../include/Field/BareField.h"
+#include "../include/Meshes/CartesianCentering.h"
+#include "../include/Particle/ParticleBC.h"
 
-#include "../../include/Manager/BaseManager.h"
+#include "../include/Manager/BaseManager.h"
 #include "SPHParticle_radovan.hpp"
 #include "Manager.h"
 
@@ -71,8 +71,8 @@ int main(int argc, char* argv[]) {
 
  		ParticleSpatialLayout<double, dim> myparticlelayout(layout, mesh);
 
-		double h = 0.01;
-        double dt = 0.7*1e-4;
+		double h = 0.02;
+        double dt = 1e-3;
 
         Manager<dim> manager(myparticlelayout, origin, extent, dt, h, 1.4);
         std::vector<Vector<double, dim>> R_part_0;

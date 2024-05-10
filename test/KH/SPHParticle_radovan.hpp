@@ -1,5 +1,5 @@
-#include "../../include/Particle/ParticleBase.h"
-#include "../../include/Particle/ParticleAttrib.h"
+#include "../include/Particle/ParticleBase.h"
+#include "../include/Particle/ParticleAttrib.h"
 #pragma once
 #include <cmath>
 #include <iostream>

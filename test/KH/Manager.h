@@ -3,25 +3,26 @@
 #include <iostream>
 #include <cmath>
 
-#include "../../include/Ippl.h"
+#include "../include/Ippl.h"
 
-#include "../../include/Expression/IpplExpressions.h" 
+#include "../include/Expression/IpplExpressions.h" 
 //#include "../../include/Expression/IpplOperators.h" 
 
-#include "../../include/Types/Vector.h"
-#include "../../include/Particle/ParticleLayout.h"
-#include "../../include/Particle/ParticleSpatialLayout.h"
-#include "../../include/Particle/ParticleBase.h"
-#include "../../include/Particle/ParticleAttribBase.h"
-#include "../../include/Particle/ParticleAttrib.h"
-#include "../../include/FieldLayout/FieldLayout.h"
-#include "../../include/Field/Field.h"
-#include "../../include/Field/BareField.h"
-#include "../../include/Meshes/CartesianCentering.h"
-#include "../../include/Particle/ParticleBC.h"
+#include "../include/Types/Vector.h"
+#include "../include/Particle/ParticleLayout.h"
+#include "../include/Particle/ParticleSpatialLayout.h"
+#include "../include/Particle/ParticleBase.h"
+#include "../include/Particle/ParticleAttribBase.h"
+#include "../include/Particle/ParticleAttrib.h"
+#include "../include/FieldLayout/FieldLayout.h"
+#include "../include/Field/Field.h"
+#include "../include/Field/BareField.h"
+#include "../include/Meshes/CartesianCentering.h"
+#include "../include/Particle/ParticleBC.h"
 
-#include "../../include/Manager/BaseManager.h"
+#include "../include/Manager/BaseManager.h"
 #include "SPHParticle_radovan.hpp"
+#include <Kokkos_Core.hpp>
 
 
 using namespace ippl;
@@ -181,60 +182,69 @@ public:
         { 
             const std::size_t N_particles = particles.position.size();
 
+            Kokkos::View<ippl::Vector<double, Dim>*> x_n("x", N_particles);
+            Kokkos::View<ippl::Vector<double, Dim>*> v_n("v", N_particles);
+            Kokkos::View<double*> s_n("s", N_particles);
+
+            //std::vector<ippl:Vector<T, Dim>> x_n;
+            //std::vector<ippl:Vector<T, Dim>> v_n;
+            //std::vector<ippl:Vector<T, Dim>> x_n;
+            
             Kokkos::parallel_for(N_particles, 
-              KOKKOS_LAMBDA (const std::size_t p_idx){
+              KOKKOS_LAMBDA (const int p_idx){
+   
+                x_n(p_idx) = particles.position(p_idx);
+                v_n(p_idx) = particles.velocity(p_idx);
+                s_n(p_idx) = particles.entropy(p_idx);
 
-                // Update velocity with half of the acceleration
-                particles.velocity(p_idx) = particles.velocity(p_idx) + particles.accel(p_idx) * dt / 2.;
+                particles.position(p_idx) = x_n(p_idx) + (dt/2)*v_n(p_idx);
+                particles.velocity(p_idx) = v_n(p_idx) + (dt/2)*particles.accel(p_idx);
+                particles.entropy(p_idx) = s_n(p_idx) + (dt/2)*particles.d_entropy(p_idx);
 
-                // Update position
-                particles.position(p_idx) = particles.position(p_idx) + particles.velocity(p_idx) * dt;
 
-                // Update velocity with the other half of the acceleration
-                particles.velocity(p_idx) = particles.velocity(p_idx) + particles.accel(p_idx) * dt / 2.;
-
-                // Initial values
-                auto initial_entropy = particles.entropy(p_idx);
-                
-                // First step of Runge-Kutta
-                auto k1_entropy = particles.d_entropy(p_idx) * dt;
-
-                // Second step of Runge-Kutta
-                auto k2_entropy = particles.d_entropy(p_idx) * dt;
-
-                // Third step of Runge-Kutta
-                auto k3_entropy = particles.d_entropy(p_idx) * dt;
-
-                // Fourth step of Runge-Kutta
-                auto k4_entropy = particles.d_entropy(p_idx) * dt;
-
-                // Update entropy
-                particles.entropy(p_idx) = initial_entropy + (k1_entropy + 2.0 * k2_entropy + 2.0 * k3_entropy + k4_entropy) / 6.0;
-
-                // Boundary conditions for the the particular KH instability problem i.e. periodic in x and reflecting in y
-                //We expect to set the BC in a more efficient way in the future, but for now this is the way to do it
-
-                if(particles.position(p_idx)[0] < low_[0]) {
-                    // Reflect the position
+                if(particles.position(p_idx)[0] < 0.01){
                     particles.position(p_idx)[0] = 0.99; 
                 }
-                if(particles.position(p_idx)[1] < 0.01){
-                }
                 if(particles.position(p_idx)[0] > 0.99) {
-                    // Reflect the position
                     particles.position(p_idx)[0] = 0.01; 
                 }  
 
-                if(particles.position(p_idx)[1] < low_[1] + eps ||
-                   particles.position(p_idx)[1] > low_[1] + L_[1] - eps) {
-                    // Reflect the position
-                    particles.position(p_idx)[1] = std::max(low_[1] + eps, 
-                        std::min(low_[1] + L_[1] - eps, particles.position(p_idx)[1])); // Clamp position to [0,1]
+                if(particles.position(p_idx)[1] < 0.01 ||
+                   particles.position(p_idx)[1] > 0.99) {
+                    particles.position(p_idx)[1] = std::max(0.01, 
+                        std::min(0.99, particles.position(p_idx)[1])); // Clamp position to [0,1]
 
-                    // Reverse the speed in the respective direction
                     particles.velocity(p_idx)[1] *= -1.0;
                 }
             });
+
+            pre_step(true);
+
+            Kokkos::parallel_for(N_particles, 
+              KOKKOS_LAMBDA (const std::size_t p_idx){
+                
+                
+                particles.position(p_idx) = x_n(p_idx) + dt*particles.velocity(p_idx);
+                particles.velocity(p_idx) = v_n(p_idx) + dt*particles.accel(p_idx);
+                particles.entropy(p_idx) = s_n(p_idx) + dt*particles.d_entropy(p_idx);
+
+
+                if(particles.position(p_idx)[0] < 0.01){
+                    particles.position(p_idx)[0] = 0.99; 
+                }
+                if(particles.position(p_idx)[0] > 0.99) {
+                    particles.position(p_idx)[0] = 0.01; 
+                }  
+
+                if(particles.position(p_idx)[1] < 0.01 ||
+                   particles.position(p_idx)[1] > 0.99) {
+                    particles.position(p_idx)[1] = std::max(0.01, 
+                        std::min(0.99, particles.position(p_idx)[1])); // Clamp position to [0,1]
+
+                    particles.velocity(p_idx)[1] *= -1.0;
+                }
+            });
+
         }
 
         // The following functions are used to calculate the density, 
