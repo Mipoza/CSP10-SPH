@@ -71,7 +71,7 @@ int main(int argc, char* argv[]) {
 	Vec<T, DIM> extent = {1.0, 1.0};
 
 	T h = 0.05;
-  T dt = 1e-2;
+  T dt = 0.5*1e-2;
 
   constexpr static const bool periodic[2] = {true, false};
   constexpr bool visc = true;
@@ -162,14 +162,14 @@ int main(int argc, char* argv[]) {
 			circle.setPosition(pos(j)[0]*width, pos(j)[1]*height); 
 			window.draw(circle);
     }
-    std::cout << "pos :" << manager.position(500) << std::endl;
+    /*std::cout << "pos :" << manager.position(500) << std::endl;
     std::cout << "dens :" << manager.density(500) << std::endl;
     std::cout << "pressure :" << manager.pressure(500) << std::endl;
     std::cout << "entro :" << manager.entropy(500) << std::endl;
     std::cout << "d_entropy :" << manager.d_entropy(500) << std::endl;
     std::cout << "vel :" << manager.velocity(500) << std::endl;
     std::cout << "accel :" << manager.accel(500) << std::endl;
-    std::cout << "h :" << manager.smoothing_kernel_sizes(500) << std::endl;
+    std::cout << "h :" << manager.smoothing_kernel_sizes(500) << std::endl;*/
 
 		window.display();
 

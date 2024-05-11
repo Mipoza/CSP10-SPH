@@ -1,3 +1,0 @@
-/home/me/Documents/somecode/sph_loc_1d/extended_nn_template/build/CMakeFiles/KHInstability.dir
-/home/me/Documents/somecode/sph_loc_1d/extended_nn_template/build/CMakeFiles/edit_cache.dir
-/home/me/Documents/somecode/sph_loc_1d/extended_nn_template/build/CMakeFiles/rebuild_cache.dir
