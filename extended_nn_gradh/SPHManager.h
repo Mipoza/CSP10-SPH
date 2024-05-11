@@ -323,10 +323,10 @@ struct SPHManager {
 
           // TODO: IMPLEMENT BOUNDARY CONDITIONS PROPERLY
           // Apply bc
-          if(position(p_idx)[0] < low_[0] + eps)
-            position(p_idx)[0] = low_[1] + L_[1] - eps; 
-          if(position(p_idx)[0] > low_[1] + L_[1] - eps)
-            position(p_idx)[0] = low_[0] + eps; 
+         if(position(p_idx)[0] < low_[0] )
+            position(p_idx)[0] = low_[1] + L_[1] + ( position(p_idx)[0] -(low_[0] )); 
+          if(position(p_idx)[0] > low_[1] + L_[1] )
+            position(p_idx)[0] = low_[0]  + position(p_idx)[0] - (low_[1] + L_[1] ); 
 
           if(position(p_idx)[1] < low_[1] + eps ||
              position(p_idx)[1] > low_[1] + L_[1] - eps) {
