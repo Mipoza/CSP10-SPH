@@ -54,10 +54,10 @@ RM = /usr/bin/cmake -E rm -f
 EQUALS = =
 
 # The top-level source directory on which CMake was run.
-CMAKE_SOURCE_DIR = /home/me/Documents/somecode/sph_loc_1d/extended_nn_template
+CMAKE_SOURCE_DIR = /home/me/Documents/CSP10-SPH/extended_nn_template
 
 # The top-level build directory on which CMake was run.
-CMAKE_BINARY_DIR = /home/me/Documents/somecode/sph_loc_1d/extended_nn_template/build
+CMAKE_BINARY_DIR = /home/me/Documents/CSP10-SPH/extended_nn_template/build
 
 #=============================================================================
 # Directory level rules for the build root directory
@@ -81,14 +81,14 @@ clean: CMakeFiles/KHInstability.dir/clean
 CMakeFiles/KHInstability.dir/all:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/KHInstability.dir/build.make CMakeFiles/KHInstability.dir/depend
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/KHInstability.dir/build.make CMakeFiles/KHInstability.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/me/Documents/somecode/sph_loc_1d/extended_nn_template/build/CMakeFiles --progress-num=1,2 "Built target KHInstability"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/me/Documents/CSP10-SPH/extended_nn_template/build/CMakeFiles --progress-num=1,2 "Built target KHInstability"
 .PHONY : CMakeFiles/KHInstability.dir/all
 
 # Build rule for subdir invocation for target.
 CMakeFiles/KHInstability.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /home/me/Documents/somecode/sph_loc_1d/extended_nn_template/build/CMakeFiles 2
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/me/Documents/CSP10-SPH/extended_nn_template/build/CMakeFiles 2
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 CMakeFiles/KHInstability.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /home/me/Documents/somecode/sph_loc_1d/extended_nn_template/build/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/me/Documents/CSP10-SPH/extended_nn_template/build/CMakeFiles 0
 .PHONY : CMakeFiles/KHInstability.dir/rule
 
 # Convenience name for target.

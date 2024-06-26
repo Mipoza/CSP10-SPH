@@ -6,7 +6,8 @@
 #include "std_array_overloads.hpp"
 #include "ChainingMesh.hpp"
 #include "kernels.hpp"
-#include "solve.hpp"
+//#include "solve.hpp"
+#include "regula_falsi.hpp"
 #include <limits>
 
 #define MAX(x, y) (x > y ? x : y)
@@ -208,7 +209,8 @@ struct SPHManager {
           }
           // Solve equation to get to smoothing kernel size
           // TODO: Implement regula-falsi instead of bisection
-          const auto fac = MAX(eps, solve(my_mass_func, h0, h1));
+          // const auto fac = MAX(eps, solve(my_mass_func, h0, h1));
+          const auto fac = MAX(eps, illinois_lower_bound(h0, h1, my_mass_func));
           smoothing_kernel_sizes(p_idx) = fac*h;
 #ifdef _DEBUG
           compute_density(p_idx, fac);

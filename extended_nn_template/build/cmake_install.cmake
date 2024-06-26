@@ -1,4 +1,4 @@
-# Install script for directory: /home/me/Documents/somecode/sph_loc_1d/extended_nn_template
+# Install script for directory: /home/me/Documents/CSP10-SPH/extended_nn_template
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)
@@ -50,5 +50,5 @@ endif()
 
 string(REPLACE ";" "\n" CMAKE_INSTALL_MANIFEST_CONTENT
        "${CMAKE_INSTALL_MANIFEST_FILES}")
-file(WRITE "/home/me/Documents/somecode/sph_loc_1d/extended_nn_template/build/${CMAKE_INSTALL_MANIFEST}"
+file(WRITE "/home/me/Documents/CSP10-SPH/extended_nn_template/build/${CMAKE_INSTALL_MANIFEST}"
      "${CMAKE_INSTALL_MANIFEST_CONTENT}")
