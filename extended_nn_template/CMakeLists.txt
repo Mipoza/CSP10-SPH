@@ -1,6 +1,7 @@
 project(SPH CXX)
 
 add_compile_options(-Ofast -Wall)
+# add_compile_options(-ggdb -Wall)
 
 set (CMAKE_CXX_STANDARD 23)
 

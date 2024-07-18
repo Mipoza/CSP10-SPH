@@ -13,6 +13,10 @@
 #define MAX(x, y) (x > y ? x : y)
 #define eps (2*std::numeric_limits<T>::epsilon())
 
+template <unsigned DIM>
+constexpr auto SPHERE_VOL_FAC(){
+    return std::pow(M_PI, DIM/2.)/std::tgamma(DIM/2. + 1);
+}
 
 template <typename T, unsigned int DIM>
 struct viscosity_factor{
@@ -25,11 +29,13 @@ struct viscosity_factor{
     inline T operator()(T c, T density, Vec<T, DIM> dis, Vec<T, DIM> vel, T h) const {
         T rij = Kokkos::sqrt(dis.dot(dis));
         T dot_product = dis.dot(vel);
-        T mu = h*dot_product/(std::pow(rij,2) + 0.01*std::pow(h,2));
+        T mu = h*dot_product/(std::pow(rij, 2) + 0.01*std::pow(h,2));
 
         // TODO: FIGURE OUT IF WE NEED TO CHANGE THIS SIGN
-        if (dot_product < 0) {return ((alpha * c * mu) + (beta * mu * mu)) / (density + eps);} 
-        else {return 0;}
+        if (dot_product < 0) 
+          return ((alpha * c * mu) + (beta * mu * mu)) / (density + eps);
+        else 
+          return 0;
     }
 };
 
@@ -110,7 +116,7 @@ struct SPHManager {
               std::vector<T> m_part,
               std::vector<T> entropy_part,
               T mass_target_ = -1) {
-      int N_new = R_part.size();
+      unsigned N_new = R_part.size();
       create_particles(N_new);
 
       auto R_host = Kokkos::create_mirror_view(position);
@@ -132,10 +138,17 @@ struct SPHManager {
       Kokkos::deep_copy(mass, m_host);
       Kokkos::deep_copy(entropy, entropy_host);
       // Set it to something
-      if(mass_target_ == -1)
-        mass_target = 4*avg_m;
+      if(mass_target_< 0)
+        mass_target = avg_m * K(0., h) * 
+                      std::pow(h, DIM)*SPHERE_VOL_FAC<DIM>() 
+                      * (-mass_target_);
       else 
         mass_target = mass_target_;
+
+      // Compute kernels right away, otherwise it would have to be done
+      // before the first step
+      updateNeighbors();
+      compute_kernels();
     }
     
     KOKKOS_INLINE_FUNCTION
@@ -157,19 +170,14 @@ struct SPHManager {
           Vec<T, DIM> d = other_pos - position(p_idx);
           T rij = Kokkos::sqrt(d.dot(d));
           density(p_idx) += 
-            mass(other_idx)*K(rij, h_loc*h);
+            mass(other_idx) * K(rij, h_loc*h);
         }
       );
-      // if(r > 1) std::cout << r << " " << h_loc << " " << density(p_idx)*std::pow(h_loc*h, DIM) << " " << mass_target << std::endl;
     }
 
-    // Perform the integration over the smoothing kernels
-    void smoothen(){ 
-      viscosity_factor<T, DIM> visc(0.2);
-      updateNeighbors();
-
+    void compute_kernels(){
       const std::size_t N_particles = position.size();
-#ifdef _DEBUG
+//#ifdef _DEBUG
       T minh = L_[0], maxh = 0, 
         min_mass = mass_target*N_particles, max_mass = 0,
         minerr = min_mass, maxerr = 0;
@@ -179,64 +187,75 @@ struct SPHManager {
       T* max_mass_ptr = &max_mass;
       T* minerr_ptr = &minerr;
       T* maxerr_ptr = &maxerr;
-#endif
-      // BIG TODO: ADD GRAD H TERMS
+//#endif
+      // Find the smoothing kernel sizes
       Kokkos::parallel_for(N_particles, 
         KOKKOS_LAMBDA (const std::size_t p_idx){
           // First: compute smoothing kernel size
           // Helper function
           auto my_mass_func = [&](const T h_) -> T {
-            // If it is smaller than the chaining mesh resolution
-            // just tell it to terminate
-            // Otherwise continue
             compute_density(p_idx, h_);
-            return std::pow(h*h_, DIM)*density(p_idx) - mass_target;
+            return std::pow(h*h_, DIM)*SPHERE_VOL_FAC<DIM>()*density(p_idx) - mass_target;
           };
 
           const T h_current = smoothing_kernel_sizes(p_idx)/h;
           compute_density(p_idx, h_current);
           // Initial values for smoothing kernel sizes
-          const T current_mass = density(p_idx)*std::pow(h_current*h, DIM);
+          const T current_mass = density(p_idx)*std::pow(h_current*h, DIM)*
+                                  SPHERE_VOL_FAC<DIM>();
           T h0, h1;
+          T fac = 1;
           if(current_mass > mass_target){
             // Too much mass, give a slope towards smaller h
             h1 = h_current;
-            h0 = eps;
-          } else{
+            h0 = 0;
+            fac = illinois_lower_bound(h0, h1, my_mass_func);
+          } else if(current_mass < mass_target){
             // Opposite, give a slope which goes towards bigger h
             h1 = h_current*2;
             h0 = h_current;
+            fac = illinois_lower_bound(h0, h1, my_mass_func);
           }
-          // Solve equation to get to smoothing kernel size
-          // TODO: Implement regula-falsi instead of bisection
-          // const auto fac = MAX(eps, solve(my_mass_func, h0, h1));
-          const auto fac = MAX(eps, illinois_lower_bound(h0, h1, my_mass_func));
+          // Else keep h_current
+
           smoothing_kernel_sizes(p_idx) = fac*h;
-#ifdef _DEBUG
+//#ifdef _DEBUG
           compute_density(p_idx, fac);
           Kokkos::atomic_max(maxh_ptr, fac*h);
           Kokkos::atomic_min(minh_ptr, fac*h);
-          Kokkos::atomic_max(max_mass_ptr, density(p_idx)*std::pow(fac*h, DIM));
-          Kokkos::atomic_min(min_mass_ptr, density(p_idx)*std::pow(fac*h, DIM));
+          Kokkos::atomic_max(max_mass_ptr, 
+              density(p_idx)*std::pow(fac*h, DIM)*SPHERE_VOL_FAC<DIM>());
+          Kokkos::atomic_min(min_mass_ptr, 
+              density(p_idx)*std::pow(fac*h, DIM)*SPHERE_VOL_FAC<DIM>());
           Kokkos::atomic_max(maxerr_ptr, std::abs(my_mass_func(fac)));
           Kokkos::atomic_min(minerr_ptr, std::abs(my_mass_func(fac)));
-#endif
-          // std::cout << fac << std::endl;
-          // Update pressure while we're at it (TODO: add grad_h)
-          pressure(p_idx) = entropy(p_idx)*
-            pow(density(p_idx), Adiabatic_index);
+//#endif
         }
       );
-#ifdef _DEBUG
+//#ifdef _DEBUG
       std::cout << std::endl;
-      std::cout << "Min/Max h: " << minh/h << "/" << maxh/h << std::endl;
+      std::cout << "Min/Max h/h0: " << minh/h << "/" << maxh/h << std::endl;
       std::cout << "Min/Max mass: " << min_mass << "/" << max_mass << std::endl;
-      std::cout << "Min/Max err: " << minerr << "/" << maxerr << std::endl;
+      std::cout << "Mass Target: " << mass_target << std::endl;
+      std::cout << "Min/Max relerr: " << minerr/mass_target << "/"
+                                      << maxerr/mass_target << std::endl;
       std::cout << std::endl;
-#endif
+//#endif
+
+    }
+
+    // Perform the integration over the smoothing kernels
+    void smoothen(){ 
+      viscosity_factor<T, DIM> visc(1.2);
+
+      const std::size_t N_particles = position.size();
       //compute gradh
       Kokkos::parallel_for(N_particles, 
         KOKKOS_LAMBDA (const std::size_t p_idx){
+          // Have to compute pressure sooner or later
+          pressure(p_idx) = entropy(p_idx)*
+            pow(density(p_idx), Adiabatic_index);
+
           gradh(p_idx) = 0;
 
           T aux_loop = 0;
@@ -277,7 +296,7 @@ struct SPHManager {
                 Vec<T, DIM> d = other_pos - position(p_idx);
                 Vec<T, DIM> vel = other_vel - velocity(p_idx);
                 T rij = Kokkos::sqrt(d.dot(d));
-                T vij = Kokkos::sqrt(vel.dot(vel));
+                // T vij = Kokkos::sqrt(vel.dot(vel));
 
                 if constexpr (viscous) {
 
@@ -326,6 +345,36 @@ struct SPHManager {
       );
     }
 
+    template <unsigned DIR = 0>
+    KOKKOS_INLINE_FUNCTION
+    void apply_bcs(const std::size_t p_idx){
+      if constexpr(DIR < DIM){
+        // Periodic
+        if constexpr(PERIODIC[DIR]){
+          if(position(p_idx)[DIR] < low_[DIR] + eps)
+            position(p_idx)[DIR] += L_[DIR];
+          else if(position(p_idx)[DIR] > low_[DIR] + L_[DIR] - eps)
+            position(p_idx)[DIR] -= L_[DIR]; 
+        }
+        // Else reflective
+        else {
+          if(position(p_idx)[DIR] < low_[DIR] + eps) {
+           // Reflect the position
+           position(p_idx)[DIR] = 2. * low_[DIR] - position(p_idx)[DIR];
+           // Reverse the speed in the respective direction
+           velocity(p_idx)[DIR] *= -1.0;
+          }
+          else if(position(p_idx)[DIR] > low_[DIR] + L_[DIR] - eps) {
+           // Reflect the position
+           position(p_idx)[DIR] = 2. * (low_[DIR] + L_[DIR]) - position(p_idx)[DIR];
+           // Reverse the speed in the respective direction
+           velocity(p_idx)[DIR] *= -1.0;
+          }
+        }
+        apply_bcs<DIR + 1>(p_idx);
+      }
+    }
+
     /**
      * @brief A method that should be used to execute/advance a step of simulation.
      *
@@ -348,25 +397,14 @@ struct SPHManager {
           // Update velocity with half of the acceleration
           velocity(p_idx) += accel(p_idx) * dt / 2.;
           // Update position
+          // Has to be the ONLY place in the simulation where it is changed
+          // It shold always be followed by compute_kernels() before the next
+          // smoothen()
           position(p_idx) += velocity(p_idx) * dt;
           // Update entropy
           entropy(p_idx) += d_entropy(p_idx) * dt / 2.;
-
-          // TODO: IMPLEMENT BOUNDARY CONDITIONS PROPERLY
-          // Apply bc
-          if(position(p_idx)[0] < low_[0])
-            position(p_idx)[0] = low_[0] + L_[0] - eps;//low_[1] + L_[1] - eps; 
-          if(position(p_idx)[0] > low_[0] + L_[0])
-            position(p_idx)[0] = low_[0] + eps;//low_[0] + eps; 
-
-          if(position(p_idx)[1] < low_[1] + eps ||
-             position(p_idx)[1] > low_[1] + L_[1] - eps) {
-            // Reflect the position & clamp position
-            position(p_idx)[1] = std::max(low_[1] + eps, 
-                std::min(low_[1] + L_[1] - eps, position(p_idx)[1])); 
-            // Reverse the speed in the respective direction
-            velocity(p_idx)[1] *= -1.0;
-          }
+          // Apply boundary conditions
+          apply_bcs(p_idx);
         }
       );
 
@@ -375,6 +413,8 @@ struct SPHManager {
       // yet to be found
 
       // Update acceleration
+      updateNeighbors();
+      compute_kernels();
       smoothen();
 
       // Kick again

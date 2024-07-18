@@ -154,7 +154,7 @@ struct ChainingMeshHelper{
     }
   }
 
-  // Get a list of indices of cells neighboring ``current''
+  // Iterate over cells neighboring ``current''
   template <typename FUNCTOR>
   KOKKOS_INLINE_FUNCTION
   void it_over_neighbors(std::array<IDX_TYPE, DIM>& current, 

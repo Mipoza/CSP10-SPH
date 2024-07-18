@@ -70,9 +70,9 @@ int main(int argc, char* argv[]) {
  	Vec<T, DIM> origin = {0.0, 0.0};
 	Vec<T, DIM> extent = {1.0, 1.0};
 
-	T h = 0.0075;
+	T h = 0.1;
   T dt = 1e-3;
-  unsigned N_particles = 10'000;
+  unsigned N_particles = 1024;//10'000;
 
   constexpr static const bool periodic[2] = {true, false};
   constexpr bool visc = true;
@@ -82,12 +82,12 @@ int main(int argc, char* argv[]) {
   std::vector<T> m_part_0;
   std::vector<T> entropy_part_0;
 
-  // //Initializing random particle positions and velocities within Manager object
+  //Initializing random particle positions and velocities within Manager object
 
+  std::mt19937 gen_2(0); // Mersenne Twister pseudo-random generator, seeded with rd()
+  // Uniform distribution between 0 and 1
+  std::uniform_real_distribution<> rand01(0.0, 1.0); 
 
-  std::random_device rd_2;  // Non-deterministic random number generator
-  std::mt19937 gen_2(rd_2()); // Mersenne Twister pseudo-random generator, seeded with rd()
-  std::uniform_real_distribution<> dist_2(0.0, 1.0); // Uniform distribution between 0 and 1
   const T box_width = 1.0;
   const T box_height = 1.0;
   const T density_ = 10.0;
@@ -105,8 +105,8 @@ int main(int argc, char* argv[]) {
   for (unsigned i = 0; i < N_side; i++) {
     for (unsigned j = 0; j < N_side; j++) {
       // Upper region
-      T x = i * dx;
-      T y = (box_height / 2.0) + j * dy;
+      T x = rand01(gen_2); //i * dx;
+      T y = (box_height / 2.0) + rand01(gen_2)/2.; //j * dy;
 
       R_part_0.push_back(Vec<T, 2>(x, y));
       v_part_0.push_back(Vec<T, 2>(velocity_1, 0.0));
@@ -114,7 +114,7 @@ int main(int argc, char* argv[]) {
       entropy_part_0.push_back(1.25);
 
       // Lower region
-      y = j * dy ;
+      y = extent[1] - y; //j * dy;
       R_part_0.push_back(Vec<T, 2>(x, y));
       v_part_0.push_back(Vec<T, 2>(velocity_2, 0.0));
       m_part_0.push_back(mass);
@@ -122,12 +122,15 @@ int main(int argc, char* argv[]) {
     }
   }
 
-  manager.init(R_part_0, v_part_0, m_part_0, entropy_part_0);
+  const T mass_target_factor = 5;
+  manager.init(R_part_0, v_part_0, m_part_0, entropy_part_0, -mass_target_factor);
 
   std::vector<T> position;
   std::vector<T> pressure;
   std::vector<T> density;
   std::vector<T> velocity;
+  
+  std::cout << std::scientific;
 
 	const unsigned int N_times = 10000;
 	//integration loop of the time eovlution
@@ -135,8 +138,8 @@ int main(int argc, char* argv[]) {
 
   auto color_q = [&](const std::size_t& p_idx){
     return manager.density(p_idx);
-    // return std::sqrt(manager.velocity(p_idx)
-                // .dot(manager.velocity(p_idx)));
+    //return std::sqrt(manager.velocity(p_idx)
+    //                 .dot(manager.velocity(p_idx)));
   };
 
 	manager.smoothen();
@@ -145,18 +148,28 @@ int main(int argc, char* argv[]) {
 
 		float minv = color_q(0);
 		float maxv = color_q(0);
+    T avg = 0;
 
 		for(int k = 0; k < manager.density.size(); k++){
       minv = (minv > color_q(k) ? color_q(k) : minv);
       maxv = (maxv < color_q(k) ? color_q(k) : maxv);
+      avg += color_q(k)/manager.density.size();
 		}
 
 		auto pos = Kokkos::create_mirror_view(manager.position);
 		for (int j = 0; j < pos.size(); j++) {
 			sf::CircleShape circle(4.0f);
 
-			float t = (color_q(j) - minv) / ((maxv - minv + 0.001));
-			sf::Color color(static_cast<sf::Uint8>(255 * t), 0, static_cast<sf::Uint8>(255 * (1-t)));
+			// float t = (color_q(j) - minv) / ((maxv - minv + 0.001));
+      const float x = color_q(j);
+			const float L0 = (x - avg)  * (x - maxv)/((minv - avg)  * (minv - maxv)),
+                  L1 = (x - minv) * (x - maxv)/((avg - minv)  * (avg - maxv)),
+                  L2 = (x - minv) * (x - avg) /((maxv - minv) * (maxv - avg));
+      const float t = 0 * L0 + 0.5 * L1 + 1. * L2;
+
+			sf::Color color(static_cast<sf::Uint8>(255 * t),
+                      0, 
+                      static_cast<sf::Uint8>(255 * (1 - t)));
 			circle.setFillColor(color);
 
 			circle.setPosition(pos(j)[0]*width, pos(j)[1]*height); 
@@ -170,8 +183,6 @@ int main(int argc, char* argv[]) {
     std::cout << "vel :" << manager.velocity(500) << std::endl;
     std::cout << "accel :" << manager.accel(500) << std::endl;
     std::cout << "h :" << manager.smoothing_kernel_sizes(500) << std::endl;
-    std::cout << "mass :" << std::pow(manager.smoothing_kernel_sizes(500), 2)*manager.density(500) << std::endl;
-    std::cout << "mass_target :" << manager.mass_target << std::endl;
     std::cout << "Density min/max: " << minv << "/" << maxv << std::endl;
 
 		window.display();

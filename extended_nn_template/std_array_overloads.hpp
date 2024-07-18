@@ -84,7 +84,6 @@ struct Vec: std::array<T, DIM> {
   // Dot product
   inline T dot(const Vec& other){
     T sum = 0;
-    #pragma omp simd reduction(+: sum)
     for(unsigned d = 0; d < DIM; ++d)
       sum += this->operator[](d)*other[d];
     return sum;
