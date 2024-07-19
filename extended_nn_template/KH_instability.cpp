@@ -70,11 +70,11 @@ int main(int argc, char* argv[]) {
  	Vec<T, DIM> origin = {0.0, 0.0};
 	Vec<T, DIM> extent = {1.0, 1.0};
 
-	T h = 0.1;
+	T h = 0.0075;
   T dt = 1e-3;
-  unsigned N_particles = 1024;//10'000;
+  unsigned N_particles = 10'000;
 
-  constexpr static const bool periodic[2] = {true, false};
+  constexpr static const bool periodic[2] = {false, false};
   constexpr bool visc = true;
   SPHManager<T, DIM, periodic, visc> manager(origin, extent, dt, h, 1.4);
   std::vector<Vec<T, DIM>> R_part_0;
