@@ -1,0 +1,3 @@
+/home/rdabetic/CSP10-SPH/non_euclidian_fix/build/CMakeFiles/KHInstability.dir
+/home/rdabetic/CSP10-SPH/non_euclidian_fix/build/CMakeFiles/edit_cache.dir
+/home/rdabetic/CSP10-SPH/non_euclidian_fix/build/CMakeFiles/rebuild_cache.dir

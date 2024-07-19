@@ -13,6 +13,7 @@
 #include <unistd.h>
 #include "std_array_overloads.hpp"
 #include <iomanip>
+#include <unordered_set>
 
 #define T float
 #define MAX(x, y) (x > y ? x : y)
@@ -21,6 +22,8 @@
 T randomT(){
   return (T)(std::rand())/(T)(RAND_MAX);
 }
+
+typedef Kokkos::View<std::unordered_multiset<std::size_t>*> IDX_SET;
 
 // Compute the distance with periodicity in mind
 template <unsigned DIM, const bool PERIODIC[DIM]>
@@ -43,18 +46,17 @@ inline T unit_sq_periodic_dist(const Vec<T, DIM>& x, const Vec<T, DIM>& y){
 // Perform a simple, naive reduction over the "neighbors"
 template <unsigned DIM, const bool PERIODIC[DIM], typename VEC_ARR, 
           typename VEC_T, typename VEC_I>
-Kokkos::View<std::size_t*> naive_reduction(const VEC_T& h,
-                                           const VEC_ARR& positions,
-                                           const VEC_I& id){
+IDX_SET naive_reduction(const VEC_T& h, 
+                        const VEC_ARR& positions, 
+                        const VEC_I& id){
   const std::size_t N = positions.size();
-  Kokkos::View<std::size_t*> result("Result", N);
-  Kokkos::deep_copy(result, 0);
+  IDX_SET result("Result", N);
 
   Kokkos::parallel_for(N,
     KOKKOS_LAMBDA (const std::size_t i){
       for(std::size_t j = 0; j < N; ++j)
         if(unit_sq_periodic_dist<DIM, PERIODIC>(positions(i), positions(j)) < h(i))
-          result(i) += id(j);
+          result(i).insert(id(j));
     }
   );
 
@@ -71,7 +73,7 @@ void test_cm(const unsigned N,
 
   Vec<T, DIM> origin, L;
   for(unsigned d = 0; d < DIM; ++d){
-    origin[d] = 0;
+    origin[d] = std::sqrt(2) * d;
     L[d] = 1;
   }
 
@@ -89,7 +91,7 @@ void test_cm(const unsigned N,
     auto h_host = Kokkos::create_mirror_view(h);
     for(std::size_t i = 0; i < N; ++i){
       Vec<T, DIM> v;
-      for(unsigned d = 0; d < DIM; ++d) v[d] = randomT();
+      for(unsigned d = 0; d < DIM; ++d) v[d] = origin[d] + L[d] * randomT();
 
       pos_vec_host(i) = v;
       id_host(i) = i; // id
@@ -100,6 +102,7 @@ void test_cm(const unsigned N,
     Kokkos::deep_copy(h, h_host);
   };
 
+  std::cout << "Pass\t" << "No. incorrect points" << std::endl;
   for(unsigned k = 0; k < N_passes; ++k){
     shuffle();
     // Reduce with the ChainingMesh first,
@@ -113,8 +116,7 @@ void test_cm(const unsigned N,
     auto id_host = Kokkos::create_mirror_view(id);
     auto h_host = Kokkos::create_mirror_view(h);
 
-    Kokkos::View<std::size_t*> cm_res("CM result", N);
-    Kokkos::deep_copy(cm_res, 0);
+    IDX_SET cm_res("CM result", N);
 
     Kokkos::parallel_for(N, 
       KOKKOS_LAMBDA (const std::size_t p_idx){
@@ -124,20 +126,20 @@ void test_cm(const unsigned N,
             // Accumulate
             if(unit_sq_periodic_dist<DIM, PERIODIC>(pos_vec_view(p_idx),
                                                     pos_vec_view(other_idx)) < h(p_idx))
-              cm_res(p_idx) += id(other_idx);
+              cm_res(p_idx).insert(id(other_idx));
           }
         );
       }
     );
 
     // Reduce with the naive method
-    Kokkos::View<std::size_t*> naive_res = naive_reduction<DIM, PERIODIC>(h_host,
+    IDX_SET naive_res = naive_reduction<DIM, PERIODIC>(h_host,
         pos_vec_host, id_host);
 
-    std::size_t err;
+    std::size_t err = 0;
     Kokkos::parallel_reduce(N, 
       KOKKOS_LAMBDA (const std::size_t idx, std::size_t& val){
-        val += Kokkos::abs((long)naive_res(idx) - (long)cm_res(idx));
+        val += !(naive_res(idx) == cm_res(idx));
       },
       Kokkos::Sum<std::size_t>(err)
     );
@@ -152,13 +154,13 @@ int main(int argc, char* argv[]){
   Kokkos::initialize(argc, argv);
 
   constexpr unsigned DIM = 2;
-  constexpr const static bool PERIODIC[DIM] = {false, false};
+  constexpr const static bool PERIODIC[DIM] = {true, false};
 
   const unsigned N = 10'000;
   const T min_h = 1e-3;
   const T max_h = 1e-1;
 
-  test_cm<DIM, PERIODIC>(N, min_h, max_h, 10);
+  test_cm<DIM, PERIODIC>(N, min_h, max_h, 8);
 
   Kokkos::finalize();
 }
