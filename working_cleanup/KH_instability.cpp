@@ -6,45 +6,13 @@
 #include <ctime>
 #include <random>
 
-#include "SPHManager.h"
+#include "SPHManager.hpp"
 
 #include <SFML/Graphics.hpp>
 
 
 #define T double
 
-// Function to generate a random direction for 2D velocities
-void randomDirection(T& vx, T& vy) {
-    // Random number generator
-    std::random_device rd;
-    std::mt19937 gen(rd());
-    std::uniform_real_distribution<T> distribution(0.0, 2 * M_PI);
-
-    // Generate random angle
-    T angle = distribution(gen);
-
-    // Calculate components
-    vx = std::cos(angle);
-    vy = std::sin(angle);
-}
-
-T maxwellBoltzmann(T temperature, T mass) {
-    // Boltzmann constant (in SI units)
-    constexpr T kB = 1;
-
-    // Random number generator
-    std::random_device rd;
-    std::mt19937 gen(rd());
-    std::uniform_real_distribution<T> distribution(0.0, 1.0);
-
-    // Generate uniform random number
-    T u = distribution(gen);
-
-    // Compute inverse CDF of Maxwell-Boltzmann distribution
-    T v = std::sqrt(-2 * kB * temperature / mass * std::log(u));
-
-    return v;
-}
 
 // Call this function once at the beginning of your program
 void initialize_random_number_generator() {
@@ -71,12 +39,16 @@ int main(int argc, char* argv[]) {
 	Vec<T, DIM> extent = {1.0, 1.0};
 
 	T h = 0.01;
-  T dt = 1e-3;
-  unsigned N_particles = 1'000;
+  T CFL = 0.3;
+  T dt_max = 1;
+  unsigned N_particles = 8'000;
 
   constexpr static const bool periodic[2] = {true, false};
   constexpr bool visc = true;
-  SPHManager<T, DIM, periodic, visc> manager(origin, extent, dt, h, 1.3);
+  const T alpha = 0.1;
+  const T beta = 2*alpha;
+  SPHManager<T, DIM, periodic, visc> manager(origin, extent, CFL, h, 1.3,
+                                             dt_max, alpha, beta);
   std::vector<Vec<T, DIM>> R_part_0;
   std::vector<Vec<T, DIM>> v_part_0;
   std::vector<T> m_part_0;
@@ -99,8 +71,8 @@ int main(int argc, char* argv[]) {
   const T A = 2 * density_;//1.25;
 
   unsigned N_side = static_cast<unsigned>(std::sqrt(N_particles / 2.0));
-  T dx = box_width / N_side;
-  T dy = (box_height / 2.0) / N_side;
+  // T dx = box_width / N_side;
+  // T dy = (box_height / 2.0) / N_side;
 
   for (unsigned i = 0; i < N_side; i++) {
     for (unsigned j = 0; j < N_side; j++) {
@@ -122,8 +94,9 @@ int main(int argc, char* argv[]) {
     }
   }
 
-  const T mass_target_factor = 4;
-  manager.init(R_part_0, v_part_0, m_part_0, entropy_part_0, -mass_target_factor);
+  const T target_number_density_factor = 4;
+  manager.init(R_part_0, v_part_0, m_part_0, entropy_part_0, 
+               -target_number_density_factor);
 
   std::vector<T> position;
   std::vector<T> pressure;
@@ -132,18 +105,20 @@ int main(int argc, char* argv[]) {
   
   std::cout << std::scientific;
 
-	const unsigned int N_times = 10000;
 	//integration loop of the time eovlution
   window.clear(sf::Color::Black);
 
   auto color_q = [&](const std::size_t& p_idx){
     return manager.density(p_idx);
     // return manager.pressure(p_idx);
-    //return std::sqrt(manager.velocity(p_idx)
-    //                 .dot(manager.velocity(p_idx)));
+    // return std::sqrt(manager.velocity(p_idx)
+    //                  .dot(manager.velocity(p_idx)));
+    // return std::abs(manager.velocity(p_idx)[1]);
   };
 
 	manager.smoothen();
+  const unsigned print_freq = 32;
+	const unsigned int N_times = 10000;
 	for (unsigned int i = 0; i < N_times; i++){
 		window.clear();
 
@@ -186,7 +161,7 @@ int main(int argc, char* argv[]) {
 
 
 		auto pos = Kokkos::create_mirror_view(manager.position);
-		for (int j = 0; j < pos.size(); j++) {
+		for (std::size_t j = 0; j < pos.size(); j++) {
 			// sf::CircleShape circle(4.0f);
 
 			// float t = (color_q(j) - minv) / ((maxv - minv + 0.001));
@@ -216,22 +191,18 @@ int main(int argc, char* argv[]) {
 			circle.setPosition(pos(j)[0]*width, pos(j)[1]*height); 
 			window.draw(circle);
     }
-    //std::cout << "pos :" << manager.position(500) << std::endl;
-    //std::cout << "dens :" << manager.density(500) << std::endl;
-    //std::cout << "pressure :" << manager.pressure(500) << std::endl;
-    //std::cout << "entro :" << manager.entropy(500) << std::endl;
-    //std::cout << "d_entropy :" << manager.d_entropy(500) << std::endl;
-    //std::cout << "vel :" << manager.velocity(500) << std::endl;
-    //std::cout << "accel :" << manager.accel(500) << std::endl;
-    //std::cout << "h :" << manager.smoothing_kernel_sizes(500) << std::endl;
-    std::cout << "Color q. min/max: " << minv << "/" << maxv << std::endl;
-    std::cout << "Pressure min/max: " << minp << "/" << maxp << std::endl;
-    std::cout << "Density min/max: " << mind << "/" << maxd << std::endl;
-    std::cout << "Kernel n density min/max: " << minm << "/" << maxm << std::endl;
-    std::cout << "No Neibours min/max: " << minn << "/" << maxn << std::endl;
-    std::cout << "h min/max: " << minh << "/" << maxh << std::endl;
+    if(i % print_freq == 0){
+      std::cout << "dt: " << manager.dt << std::endl;
+      std::cout << "Color q. min/max: " << minv << "/" << maxv << std::endl;
+      std::cout << "Pressure min/max: " << minp << "/" << maxp << std::endl;
+      std::cout << "Density min/max: " << mind << "/" << maxd << std::endl;
+      std::cout << "Kernel n density min/max: " << minm << "/" << maxm << std::endl;
+      std::cout << "No Neibours min/max: " << minn << "/" << maxn << std::endl;
+      std::cout << "h:h0 min/max: " << minh/manager.h << "/" 
+                << maxh/manager.h << std::endl;
+      std::cout << std::endl;
+    }
 
-    std::cout << std::endl;
 		window.display();
 
     manager.step();
