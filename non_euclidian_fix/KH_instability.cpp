@@ -72,11 +72,11 @@ int main(int argc, char* argv[]) {
 
 	T h = 0.01;
   T dt = 1e-3;
-  unsigned N_particles = 10'000;
+  unsigned N_particles = 8'000;
 
   constexpr static const bool periodic[2] = {true, false};
   constexpr bool visc = true;
-  SPHManager<T, DIM, periodic, visc> manager(origin, extent, dt, h, 1.4);
+  SPHManager<T, DIM, periodic, visc> manager(origin, extent, dt, h, 1.3);
   std::vector<Vec<T, DIM>> R_part_0;
   std::vector<Vec<T, DIM>> v_part_0;
   std::vector<T> m_part_0;
@@ -90,9 +90,9 @@ int main(int argc, char* argv[]) {
 
   const T box_width = 1.0;
   const T box_height = 1.0;
-  const T density_ = 1.0;
+  const T density_ = 0.1;
   const T velocity_1 = 1; // Velocity of the top layer
-  const T velocity_2 = -1; // Velocity of the bottom layer
+  const T velocity_2 = (-1); // Velocity of the bottom layer
 
   // Example mass per particle assuming equal distribution initially
   T mass = (density_ * box_width * box_height) / (N_particles / 2.0);
@@ -122,7 +122,7 @@ int main(int argc, char* argv[]) {
     }
   }
 
-  const T mass_target_factor = 12;
+  const T mass_target_factor = 4;
   manager.init(R_part_0, v_part_0, m_part_0, entropy_part_0, -mass_target_factor);
 
   std::vector<T> position;
@@ -137,8 +137,8 @@ int main(int argc, char* argv[]) {
   window.clear(sf::Color::Black);
 
   auto color_q = [&](const std::size_t& p_idx){
-    // return manager.density(p_idx);
-    return manager.pressure(p_idx);
+    return manager.density(p_idx);
+    // return manager.pressure(p_idx);
     //return std::sqrt(manager.velocity(p_idx)
     //                 .dot(manager.velocity(p_idx)));
   };
@@ -152,45 +152,86 @@ int main(int argc, char* argv[]) {
     T avg = 0;
     T minp = manager.pressure(0);
     T maxp = 0;
+    T minh = 1, maxh = 0;
+    T mind = manager.density(0), maxd = 0;
+    T minm = manager.compute_n_density(0, 
+        manager.smoothing_kernel_sizes(0)/manager.h), maxm = 0,
+      avgh = 0;
+    std::size_t minn = manager.count_neighbors(0), maxn = 0;
 
-		for(int k = 0; k < manager.density.size(); k++){
+		for(std::size_t k = 0; k < manager.density.size(); k++){
       minv = (minv > color_q(k) ? color_q(k) : minv);
       maxv = (maxv < color_q(k) ? color_q(k) : maxv);
       avg += color_q(k)/manager.density.size();
+      avgh += manager.smoothing_kernel_sizes(k)/manager.density.size();
       minp = (minp > manager.pressure(k) ? manager.pressure(k) : minp); 
-      maxp = (maxp < manager.pressure(k) ? manager.pressure(k) : maxp); 
+      maxp = (maxp < manager.pressure(k) ? manager.pressure(k) : maxp);
+      T m = manager.compute_n_density(k, manager.smoothing_kernel_sizes(k)/manager.h);
+      minm = (minm > m ? m : minm);
+      maxm = (maxm < m ? m : maxm);
+      std::size_t nn = manager.count_neighbors(k);
+      minn = (minn > nn ? nn : minn);
+      maxn = (maxn < nn ? nn : maxn);
+
 		}
+    minh = *Kokkos::Experimental::min_element(Kokkos::DefaultExecutionSpace(),
+        manager.smoothing_kernel_sizes);
+    maxh = *Kokkos::Experimental::max_element(Kokkos::DefaultExecutionSpace(),
+        manager.smoothing_kernel_sizes);
+
+    mind = *Kokkos::Experimental::min_element(Kokkos::DefaultExecutionSpace(),
+        manager.density);
+    maxd = *Kokkos::Experimental::max_element(Kokkos::DefaultExecutionSpace(),
+        manager.density);
+
 
 		auto pos = Kokkos::create_mirror_view(manager.position);
 		for (int j = 0; j < pos.size(); j++) {
-			sf::CircleShape circle(4.0f);
+			// sf::CircleShape circle(4.0f);
 
 			// float t = (color_q(j) - minv) / ((maxv - minv + 0.001));
-      const float x = color_q(j);
-			const float L0 = (x - avg)  * (x - maxv)/((minv - avg)  * (minv - maxv)),
-                  L1 = (x - minv) * (x - maxv)/((avg - minv)  * (avg - maxv)),
-                  L2 = (x - minv) * (x - avg) /((maxv - minv) * (maxv - avg));
-      const float t = 0 * L0 + 0.5 * L1 + 1. * L2;
+      float x = color_q(j);
+			float L0 = (x - avg)  * (x - maxv)/((minv - avg)  * (minv - maxv)),
+            L1 = (x - minv) * (x - maxv)/((avg - minv)  * (avg - maxv)),
+            L2 = (x - minv) * (x - avg) /((maxv - minv) * (maxv - avg));
+      float t = 0. * L0 + 0.5 * L1 + 1. * L2;
 
 			sf::Color color(static_cast<sf::Uint8>(255 * t),
                       0, 
                       static_cast<sf::Uint8>(255 * (1 - t)));
+      //if(minn == manager.count_neighbors(j))
+			//  color = sf::Color(0, 255, 0);
+
+      x = manager.smoothing_kernel_sizes(j);
+			L0 = (x - avgh)  * (x - maxh)/((minh - avgh)  * (minh - maxh));
+      L1 = (x - minh) * (x - maxh)/((avgh - minh)  * (avgh - maxh));
+      L2 = (x - minh) * (x - avgh) /((maxh - minh) * (maxh - avgh));
+
+      t = 0. * L0 + 0.5 * L1 + 1. * L2;
+
+			sf::CircleShape circle(3. + 4.*t);
+
 			circle.setFillColor(color);
 
 			circle.setPosition(pos(j)[0]*width, pos(j)[1]*height); 
 			window.draw(circle);
     }
-    std::cout << "pos :" << manager.position(500) << std::endl;
-    std::cout << "dens :" << manager.density(500) << std::endl;
-    std::cout << "pressure :" << manager.pressure(500) << std::endl;
-    std::cout << "entro :" << manager.entropy(500) << std::endl;
-    std::cout << "d_entropy :" << manager.d_entropy(500) << std::endl;
-    std::cout << "vel :" << manager.velocity(500) << std::endl;
-    std::cout << "accel :" << manager.accel(500) << std::endl;
-    std::cout << "h :" << manager.smoothing_kernel_sizes(500) << std::endl;
+    //std::cout << "pos :" << manager.position(500) << std::endl;
+    //std::cout << "dens :" << manager.density(500) << std::endl;
+    //std::cout << "pressure :" << manager.pressure(500) << std::endl;
+    //std::cout << "entro :" << manager.entropy(500) << std::endl;
+    //std::cout << "d_entropy :" << manager.d_entropy(500) << std::endl;
+    //std::cout << "vel :" << manager.velocity(500) << std::endl;
+    //std::cout << "accel :" << manager.accel(500) << std::endl;
+    //std::cout << "h :" << manager.smoothing_kernel_sizes(500) << std::endl;
     std::cout << "Color q. min/max: " << minv << "/" << maxv << std::endl;
     std::cout << "Pressure min/max: " << minp << "/" << maxp << std::endl;
+    std::cout << "Density min/max: " << mind << "/" << maxd << std::endl;
+    std::cout << "Kernel n density min/max: " << minm << "/" << maxm << std::endl;
+    std::cout << "No Neibours min/max: " << minn << "/" << maxn << std::endl;
+    std::cout << "h min/max: " << minh << "/" << maxh << std::endl;
 
+    std::cout << std::endl;
 		window.display();
 
     manager.step();

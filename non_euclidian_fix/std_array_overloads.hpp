@@ -82,7 +82,7 @@ struct Vec: std::array<T, DIM> {
   }
 
   // Dot product
-  inline T dot(const Vec& other){
+  inline T dot(const Vec& other) const {
     T sum = 0;
     for(unsigned d = 0; d < DIM; ++d)
       sum += this->operator[](d)*other[d];
