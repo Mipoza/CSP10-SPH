@@ -120,9 +120,8 @@ int main(int argc, char* argv[]) {
   const unsigned print_freq = 32;
 	const unsigned int N_times = 10000;
 	for (unsigned int i = 0; i < N_times; i++){
-    if(i > 0) manager.step();
-    else manager.smoothen();
 		window.clear();
+    manager.smoothen();
 
 		float minv = color_q(0);
 		float maxv = color_q(0);
@@ -206,7 +205,7 @@ int main(int argc, char* argv[]) {
     }
 
 		window.display();
-
+    manager.step();
   }
 
   Kokkos::finalize();

@@ -22,7 +22,7 @@ template<typename T, unsigned int DIM,
          const bool PERIODIC[DIM],
          bool viscous = false,
          bool balsara = false,
-         class KERNEL = QuinticSplineKernel<T, DIM>>
+         class KERNEL = CubicSplineKernel<T, DIM>>
 struct SPHManager {
     // Parameters
     T dt, Adiabatic_index, h, n_target = -1, CFL, dt_max;
@@ -281,6 +281,7 @@ struct SPHManager {
     }
 
     // Perform the integration over the smoothing kernels
+    template <bool VISC = viscous, bool IGNORE_NORMAL = false>
     void smoothen(){ 
       const std::size_t N_particles = position.size();
 
@@ -311,7 +312,7 @@ struct SPHManager {
       );
 
       // For the Balsara correction
-      if constexpr(viscous && balsara){
+      if constexpr(VISC && balsara){
         Kokkos::parallel_for(N_particles, 
           KOKKOS_LAMBDA (const std::size_t p_idx){
             div_v(p_idx) = 0;
@@ -371,14 +372,18 @@ struct SPHManager {
                 T aux_2 = pressure(other_idx)/(std::pow(density(other_idx) + eps, 2) *
                                   gradh(other_idx));
 
-                // Viscous or non-viscous, these terms are present
-                accel(p_idx) -= mass(other_idx) * (
-                    aux_1 * (-((d)*
-                        K.grad_r(rij, smoothing_kernel_sizes(p_idx)))/(rij + eps)) +
-                    aux_2 * (-((d)*
-                        K.grad_r(rij, smoothing_kernel_sizes(other_idx)))/(rij + eps)));
+                // We have an option to ignore the pressure-acceleration,
+                // since we want to apply a split-step method
+                if constexpr(!IGNORE_NORMAL){
+                  // Viscous or non-viscous, these terms are present
+                  accel(p_idx) -= mass(other_idx) * (
+                      aux_1 * (-((d)*
+                          K.grad_r(rij, smoothing_kernel_sizes(p_idx)))/(rij + eps)) +
+                      aux_2 * (-((d)*
+                          K.grad_r(rij, smoothing_kernel_sizes(other_idx)))/(rij + eps)));
+                }
 
-                if constexpr (viscous) {
+                if constexpr (VISC) {
                   const auto& other_vel = velocity(other_idx);
                   const Vec<T, DIM> vel = other_vel - velocity(p_idx);
 
@@ -497,10 +502,23 @@ struct SPHManager {
       // RK2 seems unstable
       // TODO: Check the terms in RK2 or implement smth else
       // (Maybe split-step methods work here?)
-      if constexpr(false) rk2_step();
+      if constexpr(viscous){
+        // Split-step approach
+        dt /= 2;
+        rk2_step<true, true>();
+
+        dt *= 2;
+        verlet_step<false, false>();
+
+        dt /= 2;
+        rk2_step<true, true>();
+
+        dt *= 2;
+      } // If no viscosity is needed, just use verlet
       else verlet_step();
     }
 
+    template <bool VISC = viscous, bool IGNORE_NORMAL = false>
     inline void rk2_step(){
       const std::size_t N_particles = position.size();
 
@@ -508,7 +526,7 @@ struct SPHManager {
       Kokkos::View<Vec<T, DIM>*> v_n("v", N_particles);
       Kokkos::View<T*> s_n("s", N_particles);
 
-      smoothen();
+      smoothen<VISC, IGNORE_NORMAL>();
       Kokkos::parallel_for(N_particles, 
         KOKKOS_LAMBDA (const std::size_t p_idx){
           // Copy 
@@ -526,7 +544,7 @@ struct SPHManager {
       // Update acceleration
       updateNeighbors();
       compute_kernels();
-      smoothen();
+      smoothen<VISC, IGNORE_NORMAL>();
 
       // 2nd RK stage
       Kokkos::parallel_for(N_particles, 
@@ -542,12 +560,14 @@ struct SPHManager {
       // Position has been changed, update!
       updateNeighbors();
       compute_kernels();
-      smoothen();
+      // Only necessary for plotting if anything
+      // smoothen<VISC, IGNORE_NORMAL>();
     }
 
+    template <bool VISC = viscous, bool IGNORE_NORMAL = false>
     inline void verlet_step() { 
       const std::size_t N_particles = position.size();
-      smoothen();
+      smoothen<VISC, IGNORE_NORMAL>();
       // Kick & Drift
       Kokkos::parallel_for(N_particles, 
         KOKKOS_LAMBDA (const std::size_t p_idx){
@@ -555,8 +575,9 @@ struct SPHManager {
           velocity(p_idx) += accel(p_idx) * dt / 2.;
           // Update position
           position(p_idx) += velocity(p_idx) * dt;
-          // Update entropy
-          entropy(p_idx) += d_entropy(p_idx) * dt / 2.;
+          // Update entropy, only changes if we have viscosity
+          if constexpr(VISC)
+            entropy(p_idx) += d_entropy(p_idx) * dt / 2.;
           // Apply boundary conditions
           apply_bcs(p_idx);
         }
@@ -569,13 +590,14 @@ struct SPHManager {
       // Update acceleration
       updateNeighbors();
       compute_kernels();
-      smoothen();
+      smoothen<VISC, IGNORE_NORMAL>();
 
       // Kick again
       Kokkos::parallel_for(N_particles, 
         KOKKOS_LAMBDA (const std::size_t p_idx){
-          // Update entropy
-          entropy(p_idx) += d_entropy(p_idx) * dt / 2.;
+          // Update entropy, only changes if we have viscosity
+          if constexpr(VISC)
+            entropy(p_idx) += d_entropy(p_idx) * dt / 2.;
           // Update velocity with the other half of the acceleration
           velocity(p_idx) += accel(p_idx) * dt / 2.;
         }
