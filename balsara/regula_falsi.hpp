@@ -3,7 +3,7 @@
 #include <limits>
 #include <cmath>
 
-#define __eps (2*std::numeric_limits<SCALAR>::epsilon())
+#define __eps (8*std::numeric_limits<SCALAR>::epsilon())
 
 enum EXIT_REASON { MAXIT_REACHED, ATOL, RTOL };
 
@@ -30,12 +30,10 @@ SCALAR illinois_lower_bound(SCALAR x0, SCALAR x1, FUNCTOR f,
   //  return x1;
   //}
 
-  // std::cout << x0 << " " << x1 << " " << f0 << " " << f1 << std::endl;
-  
   // A lower bound is given by x0, so we can freely increase x1
   // if necessary. Also we assume that the root is unique and f continuous.
   if(f0 * f1 >= 0) // Same sign!
-    return illinois_lower_bound(x1, static_cast<SCALAR>(2) * x1, f, rtol, atol, maxit);
+    return illinois_lower_bound(x1, 2 * x1, f, rtol, atol, maxit);
 
   for(; (it < maxit);
       ++it){

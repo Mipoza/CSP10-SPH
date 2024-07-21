@@ -64,8 +64,13 @@ struct ChainingMesh{
   KOKKOS_INLINE_FUNCTION 
   std::array<IDX_TYPE, DIM> cell_idx(const VEC& pos) const{
     std::array<IDX_TYPE, DIM> idx;
+    // Multiply with 1 - eps
+    // It does not like values at the boundary
+    #pragma GCC unroll(DIM)
     for(unsigned i = 0; i < DIM; ++i)
-      idx[i] = static_cast<IDX_TYPE>((pos[i] - low[i])/mesh_widths[i]);
+      idx[i] = static_cast<IDX_TYPE>((pos[i] - low[i])*
+          (static_cast<T>(1) - 16*std::numeric_limits<T>::epsilon())
+                                      /mesh_widths[i]);
     return idx;
   }
 
@@ -231,8 +236,9 @@ struct ChainingMesh{
     // Create temporaries
     std::tuple<TARGET_T...> temps = create_temps(targets_...);
     std::tuple<TARGET_T...> targets(targets_...);
+    const std::size_t N_particles = std::get<0>(targets).size();
     // Copy in the right order
-    Kokkos::parallel_for("Reorder-Loop", std::get<0>(temps).size(),
+    Kokkos::parallel_for("Reorder-Loop", N_particles,
       KOKKOS_LAMBDA (const IDX_TYPE i){
         const IDX_TYPE key = idx_to_key(cell_idx(pos(i)));
         const IDX_TYPE new_idx = Kokkos::atomic_fetch_add(&current_idx(key), 1);

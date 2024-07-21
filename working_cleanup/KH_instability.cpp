@@ -43,7 +43,7 @@ int main(int argc, char* argv[]) {
   T dt_max = 1;
   unsigned N_particles = 8'000;
 
-  constexpr static const bool periodic[2] = {true, false};
+  constexpr static const bool periodic[2] = {false, false};
   constexpr bool visc = true;
   const T alpha = 0.1;
   const T beta = 2*alpha;

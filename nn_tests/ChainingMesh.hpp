@@ -13,7 +13,7 @@
 // If we were getting overflows, std::size_t would be the next-best choice
 // shorts are unsuitable, as they cannot represent a large enough range
 template <typename T, unsigned DIM, const bool PERIODIC[DIM], typename IDX_TYPE = unsigned>
-struct ChainingMeshHelper{
+struct ChainingMesh{
   std::array<T, DIM> low;           // lower left of grid
   std::array<T, DIM> L;             // extent in each dir
   std::array<T, DIM> mesh_widths;
@@ -26,8 +26,8 @@ struct ChainingMeshHelper{
   Kokkos::View<IDX_TYPE*> start_idx;
 
   template <class VEC>
-  ChainingMeshHelper(const VEC& low_, const VEC& L_,
-                     std::array<T, DIM> mesh_width){
+  ChainingMesh(const VEC& low_, const VEC& L_,
+               std::array<T, DIM> mesh_width){
     ncells = 1;
     // Read from vec-like elements, mesh_width
     // Undefined behavior if VEC has less than DIM elements
@@ -52,11 +52,11 @@ struct ChainingMeshHelper{
 
   // Overload for "uniform" mesh width
   template <class VEC>
-  ChainingMeshHelper(const VEC& low_, const VEC& L_,
-                     const T& mesh_width){
+  ChainingMesh(const VEC& low_, const VEC& L_,
+               const T& mesh_width){
     std::array<T, DIM> mesh_width_;
     for(unsigned d = 0; d < DIM; ++d) mesh_width_[d] = mesh_width;
-    *this = ChainingMeshHelper(low_, L_, mesh_width_);
+    *this = ChainingMesh(low_, L_, mesh_width_);
   }
 
   // Get the grid index as a "tuple" (here array)
@@ -64,8 +64,13 @@ struct ChainingMeshHelper{
   KOKKOS_INLINE_FUNCTION 
   std::array<IDX_TYPE, DIM> cell_idx(const VEC& pos) const{
     std::array<IDX_TYPE, DIM> idx;
+    // Multiply with 1 - eps
+    // It does not like values at the boundary
+    #pragma GCC unroll(DIM)
     for(unsigned i = 0; i < DIM; ++i)
-      idx[i] = static_cast<IDX_TYPE>((pos[i] - low[i])/mesh_widths[i]);
+      idx[i] = static_cast<IDX_TYPE>((pos[i] - low[i])*
+          (static_cast<T>(1) - 16*std::numeric_limits<T>::epsilon())
+                                      /mesh_widths[i]);
     return idx;
   }
 
@@ -231,8 +236,9 @@ struct ChainingMeshHelper{
     // Create temporaries
     std::tuple<TARGET_T...> temps = create_temps(targets_...);
     std::tuple<TARGET_T...> targets(targets_...);
+    const std::size_t N_particles = std::get<0>(targets).size();
     // Copy in the right order
-    Kokkos::parallel_for("Reorder-Loop", std::get<0>(temps).size(),
+    Kokkos::parallel_for("Reorder-Loop", N_particles,
       KOKKOS_LAMBDA (const IDX_TYPE i){
         const IDX_TYPE key = idx_to_key(cell_idx(pos(i)));
         const IDX_TYPE new_idx = Kokkos::atomic_fetch_add(&current_idx(key), 1);

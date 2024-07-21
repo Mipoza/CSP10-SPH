@@ -11,7 +11,7 @@
 #include <limits>
 
 #define MAX(x, y) (x > y ? x : y)
-#define eps (std::numeric_limits<T>::epsilon())
+#define eps (8*std::numeric_limits<T>::epsilon())
 
 template <unsigned DIM>
 constexpr auto SPHERE_VOL_FAC(){
@@ -22,7 +22,7 @@ template<typename T, unsigned int DIM,
          const bool PERIODIC[DIM],
          bool viscous = false,
          bool balsara = false,
-         class KERNEL = CubicSplineKernel<T, DIM>>
+         class KERNEL = QuinticSplineKernel<T, DIM>>
 struct SPHManager {
     // Parameters
     T dt, Adiabatic_index, h, n_target = -1, CFL, dt_max;
@@ -54,7 +54,7 @@ struct SPHManager {
       Adiabatic_index(Adiabatic_index_), 
       L_(extent), low_(low),
       alpha(alpha_), beta(beta_),
-      CFL(CFL_) {}
+      CFL(CFL_), avgh(h_) {}
 
 /* Helper functions */
 
@@ -76,15 +76,15 @@ struct SPHManager {
     // Distance between two points, possibly with 
     // periodic boundary conditions
     template <unsigned DIR = 0>
-    KOKKOS_INLINE_FUNCTION
+    __attribute__((always_inline))
     T dist2(const Vec<T, DIM>& x, const Vec<T, DIM>& y, T res = 0){
       if constexpr(DIR < DIM){
         T d = y[DIR] - x[DIR];
         if constexpr(PERIODIC[DIR]){
           if(d > L_[DIR]/2)
-            d -= static_cast<T>(L_[DIR]);
+            d -= L_[DIR];
           if(d <= -L_[DIR]/2)
-            d += static_cast<T>(L_[DIR]);
+            d += L_[DIR];
         }
         return dist2<DIR + 1>(x, y, res + d*d);
       }
@@ -104,9 +104,9 @@ struct SPHManager {
         res[DIR] = y[DIR] - x[DIR];
         if constexpr(PERIODIC[DIR]){
           if(res[DIR] > L_[DIR]/2)
-            res[DIR] -= static_cast<T>(L_[DIR]);
+            res[DIR] -= L_[DIR];
           if(res[DIR] <= -L_[DIR]/2)
-            res[DIR] += static_cast<T>(L_[DIR]);
+            res[DIR] += L_[DIR];
         }
         dist_vec_dir<DIR + 1>(x, y, res);
       }
@@ -211,7 +211,6 @@ struct SPHManager {
       // before the first step
       updateNeighbors();
       compute_kernels();
-      smoothen();
     }
 
 
@@ -219,14 +218,16 @@ struct SPHManager {
     void updateNeighbors(){
       CM.partition(position);
       // Sort for data locality
-      if constexpr(viscous && balsara)
+      if constexpr(viscous && balsara){
         CM.sort(position, mass, gradh, smoothing_kernel_sizes, 
                                 density, pressure, entropy, d_entropy, 
                                 velocity, accel, div_v, curl_v);
-      else 
+      }
+      else { 
         CM.sort(position, mass, gradh, smoothing_kernel_sizes, 
                                 density, pressure, entropy, d_entropy, 
                                 velocity, accel);
+      }
       
       // AT THE END, sort position
       CM.sort(position, position);
@@ -318,6 +319,7 @@ struct SPHManager {
             div_v(p_idx) = 0;
             curl_v(p_idx) = 0;
             // Loop over neighbor cells
+            // TODO: Check the sign conventions in the gradients
             CM.it_over_neighbors(position(p_idx),
                K.supp_radius*smoothing_kernel_sizes(p_idx), 
               [&] (const std::size_t other_idx){
@@ -440,22 +442,33 @@ struct SPHManager {
       if constexpr(DIR < DIM){
         // Periodic
         if constexpr(PERIODIC[DIR]){
-          if(position(p_idx)[DIR] < low_[DIR] + eps)
-            position(p_idx)[DIR] += L_[DIR];
-          else if(position(p_idx)[DIR] > low_[DIR] + L_[DIR] - eps)
-            position(p_idx)[DIR] -= L_[DIR]; 
+          if(position(p_idx)[DIR] < low_[DIR] + eps || 
+             position(p_idx)[DIR] > low_[DIR] + L_[DIR] - eps){
+            position(p_idx)[DIR] = low_[DIR] + std::fmod(
+                std::fmod(position(p_idx)[DIR], 
+                          L_[DIR]) + L_[DIR],
+                L_[DIR]) + eps;
+          }
         }
         // Else reflective
         else {
           if(position(p_idx)[DIR] < low_[DIR] + eps) {
            // Reflect the position
-           position(p_idx)[DIR] = 2. * low_[DIR] - position(p_idx)[DIR];
+           position(p_idx)[DIR] = low_[DIR] - position(p_idx)[DIR];
+           position(p_idx)[DIR] = low_[DIR] + std::fmod(
+               std::fmod(position(p_idx)[DIR], 
+                         L_[DIR]) + L_[DIR],
+               L_[DIR]) + eps;
            // Reverse the speed in the respective direction
            velocity(p_idx)[DIR] *= -1.0;
           }
           else if(position(p_idx)[DIR] > low_[DIR] + L_[DIR] - eps) {
            // Reflect the position
-           position(p_idx)[DIR] = 2. * (low_[DIR] + L_[DIR]) - position(p_idx)[DIR];
+           position(p_idx)[DIR] = low_[DIR] + L_[DIR] - position(p_idx)[DIR];
+           position(p_idx)[DIR] = low_[DIR] + std::fmod(
+               std::fmod(position(p_idx)[DIR], 
+                         L_[DIR]) + L_[DIR],
+               L_[DIR]) + eps;
            // Reverse the speed in the respective direction
            velocity(p_idx)[DIR] *= -1.0;
           }
@@ -500,7 +513,7 @@ struct SPHManager {
         compute_kernels();
       }
       // RK2 seems unstable
-      // TODO: Check the terms in RK2 or implement smth else
+      // TODO: Check if the formulae are really correct
       // (Maybe split-step methods work here?)
       if constexpr(viscous){
         // Split-step approach
@@ -560,8 +573,7 @@ struct SPHManager {
       // Position has been changed, update!
       updateNeighbors();
       compute_kernels();
-      // Only necessary for plotting if anything
-      // smoothen<VISC, IGNORE_NORMAL>();
+      // smoothen() comes in the next step
     }
 
     template <bool VISC = viscous, bool IGNORE_NORMAL = false>

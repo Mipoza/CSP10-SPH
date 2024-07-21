@@ -14,28 +14,28 @@ struct Vec: std::array<T, DIM> {
   Vec(COORDS... c): std::array<T, DIM>({static_cast<T>(c)...}){}
   // Assignment
   Vec& operator=(const Vec& other){
-    #pragma omp simd simdlen(DIM)
+    #pragma GCC ivdep
     for(unsigned d = 0; d < DIM; ++d)
       this->operator[](d) = other[d];
     return *this;
   }
   // Assignment
   Vec& operator=(const T& s){
-    #pragma omp simd simdlen(DIM)
+    #pragma GCC ivdep
     for(unsigned d = 0; d < DIM; ++d)
       this->operator[](d) = s;
     return *this;
   }
   // Add-assign
   inline Vec& operator+=(const Vec& other){
-    #pragma omp simd simdlen(DIM)
+    #pragma GCC ivdep
     for(unsigned d = 0; d < DIM; ++d)
       this->operator[](d) += other[d];
     return *this;
   }
   // Sub-assign
   inline Vec& operator-=(const Vec& other){
-    #pragma omp simd simdlen(DIM)
+    #pragma GCC ivdep
     for(unsigned d = 0; d < DIM; ++d)
       this->operator[](d) -= other[d];
     return *this;
@@ -43,7 +43,7 @@ struct Vec: std::array<T, DIM> {
   // Unary minus
   inline Vec operator-(){
     Vec res = *this;
-    #pragma omp simd simdlen(DIM)
+    #pragma GCC ivdep
     for(unsigned d = 0; d < DIM; ++d)
       res[d] *= -1;
     return res;
@@ -64,7 +64,7 @@ struct Vec: std::array<T, DIM> {
   // Multiplication with a scalar
   inline friend Vec operator*(const T& a, const Vec& b){
     Vec res = b;
-    #pragma omp simd simdlen(DIM)
+    #pragma GCC ivdep
     for(unsigned d = 0; d < DIM; ++d)
       res[d] *= a;
     return res;
@@ -75,7 +75,7 @@ struct Vec: std::array<T, DIM> {
   // Division with a scalar
   inline friend Vec operator/(const Vec& a, const T& b){
     Vec res = a;
-    #pragma omp simd simdlen(DIM)
+    #pragma GCC ivdep
     for(unsigned d = 0; d < DIM; ++d)
       res[d] /= b;
     return res;

@@ -78,7 +78,7 @@ void test_cm(const unsigned N,
   }
 
   const T h_mesh = (min_h + max_h)/2.;
-  ChainingMeshHelper<T, DIM, PERIODIC> CM(origin, L, h_mesh);
+  ChainingMesh<T, DIM, PERIODIC> CM(origin, L, h_mesh);
 
   Kokkos::View<Vec<T, DIM>*> pos_vec_view("pos_vec", N);
   Kokkos::View<std::size_t*> id("id", N);
