@@ -154,7 +154,7 @@ int main(int argc, char* argv[]){
   Kokkos::initialize(argc, argv);
 
   constexpr unsigned DIM = 2;
-  constexpr const static bool PERIODIC[DIM] = {true, false};
+  constexpr const static bool PERIODIC[DIM] = {true, true};
 
   const unsigned N = 10'000;
   const T min_h = 1e-3;

@@ -8,6 +8,10 @@
 
 #define MIN(x, y) (x < y ? x : y)
 
+#define COMPILATION_EVAL(e) (std::integral_constant<decltype(e), e>::value)
+constexpr unsigned powi(int base, unsigned exp){return std::pow(base, exp);}
+#define NNCells COMPILATION_EVAL(powi(3, DIM))
+
 // IDX_TYPE, unsigned should suffice for our purposes, as exceeding 4'294'967'295 will
 // likely not happen
 // If we were getting overflows, std::size_t would be the next-best choice
@@ -22,8 +26,9 @@ struct ChainingMeshHelper{
 
   // TODO(Maybe): Maybe figure out if we can do this more
   // memory-efficiently with a hash
-  Kokkos::View<unsigned*> cell_size;
-  Kokkos::View<IDX_TYPE*> start_idx;
+  // Kokkos::View<unsigned*> cell_size;
+  // Kokkos::View<IDX_TYPE*> start_idx;
+  Kokkos::UnorderedMap<IDX_TYPE, IDX_TYPE> cell_size, start_idx; 
 
   template <class VEC>
   ChainingMeshHelper(const VEC& low_, const VEC& L_,
@@ -43,11 +48,12 @@ struct ChainingMeshHelper{
     }
 
     // Allocate memory
-    Kokkos::View<unsigned*> temp1("Cell sizes", ncells);
-    cell_size = temp1;
+    // Kokkos::View<unsigned*> temp1("Cell sizes", ncells);
+    Kokkos::UnorderedMap<IDX_TYPE, IDX_TYPE> cell_size_(ncells); 
+    cell_size = cell_size_;
      
-    Kokkos::View<IDX_TYPE*> temp2("Starting indices", ncells);
-    start_idx = temp2;
+    Kokkos::UnorderedMap<IDX_TYPE, IDX_TYPE> start_idx_(ncells); 
+    start_idx = start_idx_;
   }
 
   // Overload for "uniform" mesh width
@@ -84,18 +90,24 @@ struct ChainingMeshHelper{
   template <class VEC_ARRAY>
   void partition(const VEC_ARRAY& pos_arr){
     // Reset everything to 0
-    Kokkos::deep_copy(cell_size, 0);
-    Kokkos::deep_copy(start_idx, 0);
+    //Kokkos::deep_copy(cell_size, 0);
+    //Kokkos::deep_copy(start_idx, 0);
+    cell_size.clear();
+    start_idx.clear();
     // No. particles
     const IDX_TYPE nparticles = pos_arr.size();
+
+    Kokkos::UnorderedMapInsertOpTypes<IDX_TYPE, IDX_TYPE>::AtomicAdd atomic_add;
     // Loop and add
     Kokkos::parallel_for("Cell size count loop", nparticles, 
       KOKKOS_LAMBDA (const IDX_TYPE p_idx){
         const IDX_TYPE key = idx_to_key(cell_idx(pos_arr(p_idx)));
-        Kokkos::atomic_increment(&cell_size(key));
+        cell_size.insert(key, 1, atomic_add);
+        // Kokkos::atomic_increment(&cell_size(key));
       }
     );
-
+    
+    const IDX_TYPE umap_size = cell_size.size();
     // Add up the sizes to get start and end indexes
 	  Kokkos::parallel_scan(Kokkos::RangePolicy(0, ncells), 
       KOKKOS_LAMBDA(const IDX_TYPE i, unsigned& localSum, bool isFinal){
@@ -109,7 +121,6 @@ struct ChainingMeshHelper{
   // of ``current'''
   template <int DIR, typename FUNCTOR>
   KOKKOS_INLINE_FUNCTION
-  __attribute__((always_inline))
   void generate_loops(
       std::array<IDX_TYPE, DIM>& current,
       const std::array<IDX_TYPE, DIM>& r,
@@ -181,65 +192,24 @@ struct ChainingMeshHelper{
     generate_loops<DIM - 1, FUNCTOR>(current, r, F); 
   }
   
-  /* Some helper functions */
-
-  template <typename TYPE, typename... TYPE_PACK>
-  constexpr inline __attribute__((always_inline))
-  std::tuple<TYPE, TYPE_PACK...> 
-  create_temps(TYPE& target, TYPE_PACK&... rest){
-    // TYPE == Kokkos::View<SMTH?>
-    TYPE tmp("tmp", target.size());
-    if constexpr(sizeof...(rest) > 0)
-      return std::tuple_cat(std::tuple<TYPE>(tmp),
-                            create_temps(rest...));
-    else
-      return std::tuple<TYPE>(tmp);
-  }
-
-  template <unsigned I, typename... TYPE_PACK>
-  constexpr inline void __attribute__((always_inline))
-  reassign(const IDX_TYPE& new_idx, const IDX_TYPE& i,
-           const std::tuple<TYPE_PACK...>& dest, 
-           const std::tuple<TYPE_PACK...>& src){
-    if constexpr(I < sizeof...(TYPE_PACK)){
-      std::get<I>(dest)(new_idx) = std::get<I>(src)(i);
-      reassign<I + 1, TYPE_PACK...>(new_idx, i, dest, src);
-    } else return;
-  }
-
-  template <unsigned I, typename... TYPE_PACK>
-  constexpr inline void __attribute__((always_inline))
-  deepcopy(std::tuple<TYPE_PACK...>& dest, 
-           std::tuple<TYPE_PACK...>& src){
-    if constexpr(I < sizeof...(TYPE_PACK)){
-      Kokkos::deep_copy(std::get<I>(dest),
-                        std::get<I>(src));
-      deepcopy<I + 1, TYPE_PACK...>(dest, src);
-    } else return;
-  }
-
-  /* The actual sorting */
-
   // Re-orders the target view so we can access 
   // the neighbors efficiently
-  template <typename VEC_TYPE, typename ...TARGET_T>
-  void sort(const Kokkos::View<VEC_TYPE>& pos, TARGET_T&... targets_){
-    static_assert(sizeof...(targets_) > 0);
+  template <typename VEC_TYPE, typename D_TYPE>
+  void sort(const Kokkos::View<VEC_TYPE*>& pos, Kokkos::View<D_TYPE*>& target){
     // Current index in each cell
     Kokkos::View<IDX_TYPE*> current_idx("Current Index", ncells);
     Kokkos::deep_copy(current_idx, start_idx);
-    // Create temporaries
-    std::tuple<TARGET_T...> temps = create_temps(targets_...);
-    std::tuple<TARGET_T...> targets(targets_...);
+    // Create temporary
+    Kokkos::View<D_TYPE*> temp_target("Temporary", target.size());
     // Copy in the right order
-    Kokkos::parallel_for("Reorder-Loop", std::get<0>(temps).size(),
+    Kokkos::parallel_for("Reorder-Loop", target.size(),
       KOKKOS_LAMBDA (const IDX_TYPE i){
         const IDX_TYPE key = idx_to_key(cell_idx(pos(i)));
         const IDX_TYPE new_idx = Kokkos::atomic_fetch_add(&current_idx(key), 1);
-        reassign<0, TARGET_T...>(new_idx, i, temps, targets);
+        temp_target(new_idx) = target(i);
       }
     );
     // Copy it back
-    deepcopy<0, TARGET_T...>(targets, temps);
+    Kokkos::deep_copy(target, temp_target);
   }
 };

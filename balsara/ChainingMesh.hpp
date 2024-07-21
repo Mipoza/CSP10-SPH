@@ -13,7 +13,7 @@
 // If we were getting overflows, std::size_t would be the next-best choice
 // shorts are unsuitable, as they cannot represent a large enough range
 template <typename T, unsigned DIM, const bool PERIODIC[DIM], typename IDX_TYPE = unsigned>
-struct ChainingMeshHelper{
+struct ChainingMesh{
   std::array<T, DIM> low;           // lower left of grid
   std::array<T, DIM> L;             // extent in each dir
   std::array<T, DIM> mesh_widths;
@@ -26,8 +26,8 @@ struct ChainingMeshHelper{
   Kokkos::View<IDX_TYPE*> start_idx;
 
   template <class VEC>
-  ChainingMeshHelper(const VEC& low_, const VEC& L_,
-                     std::array<T, DIM> mesh_width){
+  ChainingMesh(const VEC& low_, const VEC& L_,
+               std::array<T, DIM> mesh_width){
     ncells = 1;
     // Read from vec-like elements, mesh_width
     // Undefined behavior if VEC has less than DIM elements
@@ -52,11 +52,11 @@ struct ChainingMeshHelper{
 
   // Overload for "uniform" mesh width
   template <class VEC>
-  ChainingMeshHelper(const VEC& low_, const VEC& L_,
-                     const T& mesh_width){
+  ChainingMesh(const VEC& low_, const VEC& L_,
+               const T& mesh_width){
     std::array<T, DIM> mesh_width_;
     for(unsigned d = 0; d < DIM; ++d) mesh_width_[d] = mesh_width;
-    *this = ChainingMeshHelper(low_, L_, mesh_width_);
+    *this = ChainingMesh(low_, L_, mesh_width_);
   }
 
   // Get the grid index as a "tuple" (here array)

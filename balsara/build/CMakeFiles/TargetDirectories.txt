@@ -1,0 +1,3 @@
+/home/rdabetic/CSP10-SPH/balsara/build/CMakeFiles/KHInstability.dir
+/home/rdabetic/CSP10-SPH/balsara/build/CMakeFiles/edit_cache.dir
+/home/rdabetic/CSP10-SPH/balsara/build/CMakeFiles/rebuild_cache.dir
