@@ -38,17 +38,16 @@ int main(int argc, char* argv[]) {
  	Vec<T, DIM> origin = {0.0, 0.0};
 	Vec<T, DIM> extent = {1.0, 1.0};
 
-	T h = 0.05;
+	T h = 0.01;
   T CFL = 0.3;
   T dt_max = 1;
-  unsigned N_particles = 2'500;
+  unsigned N_particles = 1'000;
 
   constexpr static const bool periodic[2] = {false, false};
   constexpr bool visc = true;
-  constexpr bool balsara = false;
-  const T alpha = 0.6;
+  const T alpha = 0.1;
   const T beta = 2*alpha;
-  SPHManager<T, DIM, periodic, visc, balsara> manager(origin, extent, CFL, h, 1.3,
+  SPHManager<T, DIM, periodic, visc> manager(origin, extent, CFL, h, 1.3,
                                              dt_max, alpha, beta);
   std::vector<Vec<T, DIM>> R_part_0;
   std::vector<Vec<T, DIM>> v_part_0;
@@ -57,19 +56,19 @@ int main(int argc, char* argv[]) {
 
   //Initializing random particle positions and velocities within Manager object
 
-  std::mt19937 gen_2(0); // Mersenne Twister pseudo-random generator, seeded with 0
+  std::mt19937 gen_2(0); // Mersenne Twister pseudo-random generator, seeded with rd()
   // Uniform distribution between 0 and 1
   std::uniform_real_distribution<> rand01(0.0, 1.0); 
 
   const T box_width = 1.0;
   const T box_height = 1.0;
-  const T density_ = 1e3;
-  const T velocity_1 = 4; // Velocity of the top layer
-  const T velocity_2 = (-4); // Velocity of the bottom layer
+  const T density_ = 0.1;
+  const T velocity_1 = 1; // Velocity of the top layer
+  const T velocity_2 = (-1); // Velocity of the bottom layer
 
   // Example mass per particle assuming equal distribution initially
-  T mass = (density_ * box_width * box_height) / N_particles;
-  const T A = 2;//1.25;
+  T mass = (density_ * box_width * box_height) / (N_particles / 2.0);
+  const T A = 2 * density_;//1.25;
 
   unsigned N_side = static_cast<unsigned>(std::sqrt(N_particles / 2.0));
   // T dx = box_width / N_side;
@@ -114,14 +113,14 @@ int main(int argc, char* argv[]) {
     // return manager.pressure(p_idx);
     // return std::sqrt(manager.velocity(p_idx)
     //                  .dot(manager.velocity(p_idx)));
-    // return manager.curl_v(p_idx).norm();
+    // return std::abs(manager.velocity(p_idx)[1]);
   };
 
+	manager.smoothen();
   const unsigned print_freq = 32;
 	const unsigned int N_times = 10000;
 	for (unsigned int i = 0; i < N_times; i++){
 		window.clear();
-    manager.smoothen();
 
 		float minv = color_q(0);
 		float maxv = color_q(0);
@@ -171,7 +170,7 @@ int main(int argc, char* argv[]) {
             L1 = (x - minv) * (x - maxv)/((avg - minv)  * (avg - maxv)),
             L2 = (x - minv) * (x - avg) /((maxv - minv) * (maxv - avg));
       float t = 0. * L0 + 0.5 * L1 + 1. * L2;
-      // t = x/(maxv - minv) - minv/(maxv - minv);
+
 			sf::Color color(static_cast<sf::Uint8>(255 * t),
                       0, 
                       static_cast<sf::Uint8>(255 * (1 - t)));
@@ -199,12 +198,13 @@ int main(int argc, char* argv[]) {
       std::cout << "Density min/max: " << mind << "/" << maxd << std::endl;
       std::cout << "Kernel n density min/max: " << minm << "/" << maxm << std::endl;
       std::cout << "No Neibours min/max: " << minn << "/" << maxn << std::endl;
-      std::cout << "h:h0 min/max/avg: " << minh/manager.h << "/" 
-                << maxh/manager.h << "/" << manager.avgh/manager.h << std::endl;
+      std::cout << "h:h0 min/max: " << minh/manager.h << "/" 
+                << maxh/manager.h << std::endl;
       std::cout << std::endl;
     }
 
 		window.display();
+
     manager.step();
   }
 

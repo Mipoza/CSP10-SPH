@@ -1,0 +1,3 @@
+/home/rdabetic/CSP10-SPH/reflective_bd/build/CMakeFiles/KHInstability.dir
+/home/rdabetic/CSP10-SPH/reflective_bd/build/CMakeFiles/edit_cache.dir
+/home/rdabetic/CSP10-SPH/reflective_bd/build/CMakeFiles/rebuild_cache.dir
