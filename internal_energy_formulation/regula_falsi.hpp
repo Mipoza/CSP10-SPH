@@ -18,17 +18,18 @@ SCALAR illinois(SCALAR x0, SCALAR x1, FUNCTOR f,
   SCALAR x = x0, fx = f0;
   EXIT_REASON reason = MAXIT_REACHED;
 
-  unsigned it = 0;
+  unsigned it;
 
   // We know that the function is *increasing*
-  if(f0 * f1 >= 0){ // Same sign!
+  if(f0 * f1 > 0){ // Same sign!
     if(f0 > 0) // Both are positive, x is too large
-      return illinois(0.75*x0, x0, f, rtol, atol, maxit);
-    else // Both are negative, x needs is too small
-      return illinois(x1, 1.25*x1, f, rtol, atol, maxit);
+      return illinois(static_cast<SCALAR>(0.75)*x0, x0, f, rtol, atol, maxit);
+    else // Both are negative, x is too small
+      return illinois(x1, static_cast<SCALAR>(1.25)*x1, f, rtol, atol, maxit);
   }
 
-  for(; (it < maxit);
+  for(it = 0;
+      it < maxit;
       ++it){
     x = x1 - f1 * (x1 - x0)/(f1 - f0);
     fx = f(x);

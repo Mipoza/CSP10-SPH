@@ -29,7 +29,7 @@ T rand_minus1_to_1() {
 
 int main(int argc, char* argv[]) {
 	int width = 800;
-	int height = 600;
+	int height = 800;
 	sf::RenderWindow window(sf::VideoMode(width, height), "SPH Simulation");
   Kokkos::initialize(argc, argv);
 
@@ -38,22 +38,24 @@ int main(int argc, char* argv[]) {
  	Vec<T, DIM> origin = {0.0, 0.0};
 	Vec<T, DIM> extent = {1.0, 1.0};
 
-  T CFL = 0.6;
+  T CFL = 0.8;
   T dt_max = 1;
-  unsigned N_particles = 4096;
-	const T h = 4./std::sqrt(N_particles);
+  unsigned N_particles = 2048;
+	const T h = 1e-1;
 
   constexpr static const bool periodic[2] = {false, false};
   constexpr bool visc = true;
-  constexpr bool balsara = visc;
-  const T alpha = 1.2;
+  constexpr bool balsara = true;
+  const T alpha = 0.6;
   const T beta = 2*alpha;
-  SPHManager<T, DIM, periodic, visc, balsara> manager(origin, extent, CFL, h, 1.3,
-                                             dt_max, alpha, beta);
+
+  SPHManager<T, DIM, periodic, visc, balsara,
+             QuinticSplineKernel<T, DIM>> 
+  manager(origin, extent, CFL, h, 1.3, dt_max, alpha, beta);
   std::vector<Vec<T, DIM>> R_part_0;
   std::vector<Vec<T, DIM>> v_part_0;
   std::vector<T> m_part_0;
-  std::vector<T> entropy_part_0;
+  std::vector<T> uint_part_0;
 
   //Initializing random particle positions and velocities within Manager object
 
@@ -64,12 +66,12 @@ int main(int argc, char* argv[]) {
   const T box_width = 1.0;
   const T box_height = 1.0;
   const T density_ = 1e3;
-  const T velocity_1 = -4; // Velocity of the top layer
-  const T velocity_2 =  4; // Velocity of the bottom layer
+  const T velocity_1 = -10; // Velocity of the top layer
+  const T velocity_2 =  10; // Velocity of the bottom layer
 
   // Example mass per particle assuming equal distribution initially
-  T mass = (density_ * box_width * box_height) / N_particles;
-  const T A = 2;//1.25;
+  const T mass = (density_ * box_width * box_height) / N_particles;
+  const T A = 1e2 * mass;
 
   unsigned N_side = static_cast<unsigned>(std::sqrt(N_particles));
   const T dx = box_width / N_side;
@@ -77,7 +79,7 @@ int main(int argc, char* argv[]) {
   const unsigned Ny = 2 * (N_side / 2);
   const T dy = box_height / (Ny - 1);
 
-  const bool random_positions = true;
+  const bool random_positions = false;
 
   for (unsigned i = 0; i < N_side; i++) {
     // T x = rand01(gen_2);
@@ -96,21 +98,22 @@ int main(int argc, char* argv[]) {
         m_part_0.push_back(mass);
         m_part_0.push_back(mass);
 
-        entropy_part_0.push_back(A);
-        entropy_part_0.push_back(A);
-      } else{
-        x = i * dx;
-        y = j * dy;
+        uint_part_0.push_back(A);
+        uint_part_0.push_back(A);
+      } else {
+        // Issues with the numerical accuracy
+        x = 1e-4 + i * dx * (1 - 2e-4);
+        y = 1e-4 + j * dy * (1 - 2e-4);
         R_part_0.push_back(Vec<T, 2>(x, y));
         v_part_0.push_back(Vec<T, 2>(j < Ny/2 ? velocity_1 : velocity_2, 0.0));
         m_part_0.push_back(mass);
-        entropy_part_0.push_back(A);
+        uint_part_0.push_back(A);
       }
     }
   }
 
-  const T target_number_density_factor = 6;
-  manager.init(R_part_0, v_part_0, m_part_0, entropy_part_0, 
+  const T target_number_density_factor = 8;
+  manager.init(R_part_0, v_part_0, m_part_0, uint_part_0, 
                -target_number_density_factor);
 
   std::vector<T> position;
@@ -124,8 +127,9 @@ int main(int argc, char* argv[]) {
   window.clear(sf::Color::Black);
 
   auto color_q = [&](const std::size_t& p_idx){
-    return manager.density(p_idx);
-    // return manager.pressure(p_idx);
+    // return manager.density(p_idx);
+    return manager.pressure(p_idx);
+    // return std::abs(manager.div_v(p_idx));
     // return std::sqrt(manager.velocity(p_idx)
     //                  .dot(manager.velocity(p_idx)));
     // return manager.curl_v(p_idx).norm();

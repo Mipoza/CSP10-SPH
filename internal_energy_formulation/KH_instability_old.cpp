@@ -11,7 +11,7 @@
 #include <SFML/Graphics.hpp>
 
 
-#define T double
+#define T float
 
 
 // Call this function once at the beginning of your program
@@ -38,17 +38,16 @@ int main(int argc, char* argv[]) {
  	Vec<T, DIM> origin = {0.0, 0.0};
 	Vec<T, DIM> extent = {1.0, 1.0};
 
-  T CFL = 0.6;
+	T h = 0.01;
+  T CFL = 0.3;
   T dt_max = 1;
-  unsigned N_particles = 4096;
-	const T h = 4./std::sqrt(N_particles);
+  unsigned N_particles = 1'000;
 
   constexpr static const bool periodic[2] = {false, false};
   constexpr bool visc = true;
-  constexpr bool balsara = visc;
-  const T alpha = 1.2;
+  const T alpha = 0.1;
   const T beta = 2*alpha;
-  SPHManager<T, DIM, periodic, visc, balsara> manager(origin, extent, CFL, h, 1.3,
+  SPHManager<T, DIM, periodic, visc> manager(origin, extent, CFL, h, 1.3,
                                              dt_max, alpha, beta);
   std::vector<Vec<T, DIM>> R_part_0;
   std::vector<Vec<T, DIM>> v_part_0;
@@ -57,59 +56,45 @@ int main(int argc, char* argv[]) {
 
   //Initializing random particle positions and velocities within Manager object
 
-  std::mt19937 gen_2(0); // Mersenne Twister pseudo-random generator, seeded with 0
+  std::mt19937 gen_2(0); // Mersenne Twister pseudo-random generator, seeded with rd()
   // Uniform distribution between 0 and 1
   std::uniform_real_distribution<> rand01(0.0, 1.0); 
 
   const T box_width = 1.0;
   const T box_height = 1.0;
-  const T density_ = 1e3;
-  const T velocity_1 = -4; // Velocity of the top layer
-  const T velocity_2 =  4; // Velocity of the bottom layer
+  const T density_ = 0.1;
+  const T velocity_1 = 1; // Velocity of the top layer
+  const T velocity_2 = (-1); // Velocity of the bottom layer
 
   // Example mass per particle assuming equal distribution initially
-  T mass = (density_ * box_width * box_height) / N_particles;
-  const T A = 2;//1.25;
+  T mass = (density_ * box_width * box_height) / (N_particles / 2.0);
+  const T A = 2 * density_;//1.25;
 
-  unsigned N_side = static_cast<unsigned>(std::sqrt(N_particles));
-  const T dx = box_width / N_side;
-  // const T dy = (box_height / 2.0) / N_side;
-  const unsigned Ny = 2 * (N_side / 2);
-  const T dy = box_height / (Ny - 1);
-
-  const bool random_positions = true;
+  unsigned N_side = static_cast<unsigned>(std::sqrt(N_particles / 2.0));
+  // T dx = box_width / N_side;
+  // T dy = (box_height / 2.0) / N_side;
 
   for (unsigned i = 0; i < N_side; i++) {
-    // T x = rand01(gen_2);
-    for (unsigned j = 0; j < Ny/(1 + random_positions); j++) {
-      T x, y;
-      if(random_positions){
-        y = rand01(gen_2)*extent[1]/2.;
-        x = rand01(gen_2)*extent[1];
+    for (unsigned j = 0; j < N_side; j++) {
+      // Upper region
+      T x = rand01(gen_2); //i * dx;
+      T y = (box_height / 2.0) + rand01(gen_2)/2.; //j * dy;
 
-        R_part_0.push_back(Vec<T, 2>(x, y));
-        R_part_0.push_back(Vec<T, 2>(x, extent[1] - y));
+      R_part_0.push_back(Vec<T, 2>(x, y));
+      v_part_0.push_back(Vec<T, 2>(velocity_1, 0.0));
+      m_part_0.push_back(mass);
+      entropy_part_0.push_back(A);
 
-        v_part_0.push_back(Vec<T, 2>(velocity_1, 0.0));
-        v_part_0.push_back(Vec<T, 2>(velocity_2, 0.0));
-
-        m_part_0.push_back(mass);
-        m_part_0.push_back(mass);
-
-        entropy_part_0.push_back(A);
-        entropy_part_0.push_back(A);
-      } else{
-        x = i * dx;
-        y = j * dy;
-        R_part_0.push_back(Vec<T, 2>(x, y));
-        v_part_0.push_back(Vec<T, 2>(j < Ny/2 ? velocity_1 : velocity_2, 0.0));
-        m_part_0.push_back(mass);
-        entropy_part_0.push_back(A);
-      }
+      // Lower region
+      y = extent[1] - y; //j * dy;
+      R_part_0.push_back(Vec<T, 2>(x, y));
+      v_part_0.push_back(Vec<T, 2>(velocity_2, 0.0));
+      m_part_0.push_back(mass);
+      entropy_part_0.push_back(A);
     }
   }
 
-  const T target_number_density_factor = 6;
+  const T target_number_density_factor = 4;
   manager.init(R_part_0, v_part_0, m_part_0, entropy_part_0, 
                -target_number_density_factor);
 
@@ -128,14 +113,14 @@ int main(int argc, char* argv[]) {
     // return manager.pressure(p_idx);
     // return std::sqrt(manager.velocity(p_idx)
     //                  .dot(manager.velocity(p_idx)));
-    // return manager.curl_v(p_idx).norm();
+    // return std::abs(manager.velocity(p_idx)[1]);
   };
 
+	manager.smoothen();
   const unsigned print_freq = 32;
 	const unsigned int N_times = 10000;
 	for (unsigned int i = 0; i < N_times; i++){
 		window.clear();
-    manager.smoothen();
 
 		float minv = color_q(0);
 		float maxv = color_q(0);
@@ -156,8 +141,7 @@ int main(int argc, char* argv[]) {
       avgh += manager.smoothing_kernel_sizes(k)/manager.density.size();
       minp = (minp > manager.pressure(k) ? manager.pressure(k) : minp); 
       maxp = (maxp < manager.pressure(k) ? manager.pressure(k) : maxp);
-      T m = manager.compute_n_density(k, 
-          manager.smoothing_kernel_sizes(k)/manager.h);
+      T m = manager.compute_n_density(k, manager.smoothing_kernel_sizes(k)/manager.h);
       minm = (minm > m ? m : minm);
       maxm = (maxm < m ? m : maxm);
       std::size_t nn = manager.count_neighbors(k);
@@ -186,7 +170,7 @@ int main(int argc, char* argv[]) {
             L1 = (x - minv) * (x - maxv)/((avg - minv)  * (avg - maxv)),
             L2 = (x - minv) * (x - avg) /((maxv - minv) * (maxv - avg));
       float t = 0. * L0 + 0.5 * L1 + 1. * L2;
-      t = x/(maxv - minv) - minv/(maxv - minv);
+
 			sf::Color color(static_cast<sf::Uint8>(255 * t),
                       0, 
                       static_cast<sf::Uint8>(255 * (1 - t)));
@@ -214,15 +198,14 @@ int main(int argc, char* argv[]) {
       std::cout << "Density min/max: " << mind << "/" << maxd << std::endl;
       std::cout << "Kernel n density min/max: " << minm << "/" << maxm << std::endl;
       std::cout << "No Neibours min/max: " << minn << "/" << maxn << std::endl;
-      std::cout << "h0: " << manager.h << std::endl;
-      std::cout << "h:h0 min/max/avg: " << minh/manager.h << "/" 
-                << maxh/manager.h << "/" << manager.avgh/manager.h << std::endl;
+      std::cout << "h:h0 min/max: " << minh/manager.h << "/" 
+                << maxh/manager.h << std::endl;
       std::cout << std::endl;
     }
 
 		window.display();
+
     manager.step();
-    //usleep(10000);
   }
 
   Kokkos::finalize();

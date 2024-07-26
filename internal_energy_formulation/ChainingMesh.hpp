@@ -5,8 +5,10 @@
 #include <cmath>
 #include <Kokkos_Core.hpp>
 #include <Kokkos_StdAlgorithms.hpp>
+#include <limits>
 
 #define MIN(x, y) (x < y ? x : y)
+#define _eps (16*std::numeric_limits<T>::epsilon())
 
 // IDX_TYPE, unsigned should suffice for our purposes, as exceeding 4'294'967'295 will
 // likely not happen
@@ -71,7 +73,7 @@ struct ChainingMesh{
     #pragma GCC unroll(DIM)
     for(unsigned i = 0; i < DIM; ++i)
       idx[i] = static_cast<IDX_TYPE>((pos[i] - low[i])*
-          (static_cast<T>(1) - 16*std::numeric_limits<T>::epsilon())
+          (static_cast<T>(1) - _eps)
                                       /mesh_widths[i]);
     return std::move(idx);
   }
@@ -129,15 +131,12 @@ struct ChainingMesh{
       }
       else { // Reflect the absolute position
         if(std::get<0>(reflect[DIR]))
-          v[DIR] = 2*low[DIR] - v[DIR];
+          v[DIR] = 2*low[DIR] - v[DIR] - _eps;
         else if(std::get<1>(reflect[DIR])) // Assumption: radius < L[DIR]
-          v[DIR] = 2*(low[DIR] + L[DIR]) - v[DIR];
+          v[DIR] = 2*(low[DIR] + L[DIR]) - v[DIR] + _eps;
       }
     }
-    //if(std::get<0>(reflect[DIR]) ||
-    //   std::get<1>(reflect[DIR])){
-    //  std::cerr << "WAT";
-    //}
+
     if constexpr(DIR + 1 < DIM){
       reflect_vec<VEC, ABSOLUTE_POS, DIR + 1>(v, reflect);
     }
@@ -157,7 +156,7 @@ struct ChainingMesh{
       const ARR_VEC& pos_vec, 
       F_ARG_ARR&... fargs) const {
     // Degenerate case
-    if constexpr (DIR == -1){
+    if constexpr (DIR == DIM){
       const IDX_TYPE key = idx_to_key(current);
       const IDX_TYPE start_idx_base = start_idx(key);
       for(IDX_TYPE other_idx_ = 0;
@@ -173,48 +172,41 @@ struct ChainingMesh{
           reflect_vec<decltype(v), false, 0>(v, reflect);
           return v;
         };
-        //if(std::get<0>(reflect[0]) ||
-        //   std::get<1>(reflect[0])){
-        //  std::cout << "x: " << pos_vec(other_idx)[0] << std::endl;
-        //}
-        //if(std::get<0>(reflect[1]) || 
-        //   std::get<1>(reflect[1])){
-        //  std::cout << "y: " << pos_vec(other_idx)[1] << std::endl;
-        //}
-        //std::cout << std::get<0>(reflect[0]) << " " 
-        //          << std::get<1>(reflect[0]) << "\t"
-        //          << std::get<0>(reflect[1]) << " "
-        //          << std::get<1>(reflect[1]) << std::endl;
 
         auto other_pos = pos_vec(other_idx);
         reflect_vec<decltype(other_pos), true, 0>(other_pos, reflect);
 
-        F(other_idx, std::move(other_pos), std::move(get_val(fargs))...);
+        F(std::move(other_idx), 
+          std::move(other_pos), 
+          std::move(get_val(fargs))...);
       }
     }
     else{ // Else continue recursion 
       IDX_TYPE i;
       std::array<IDX_TYPE, DIM> temp = current;
       // +, ``right''
-      for(i = 0; (temp[DIR] + 1 < NN[DIR]) && (i < r[DIR]); ++i){
+      for(i = 0; (i < r[DIR]) && (temp[DIR] + 1 < NN[DIR]); ++i){
         ++temp[DIR];
-        generate_loops<DIR - 1, FUNCTOR, ARR_VEC, F_ARG_ARR...>(temp,
+        generate_loops<DIR + 1, FUNCTOR, ARR_VEC, F_ARG_ARR...>(temp,
             r, F, reflect, pos_vec, fargs...);
       }
       if(i < r[DIR]){
         if constexpr(PERIODIC[DIR]){
           temp[DIR] = 0;
-          for(; (temp[DIR] < current[DIR]) && (i < r[DIR]); ++i){
-            generate_loops<DIR - 1, FUNCTOR, ARR_VEC, F_ARG_ARR...>(temp,
+          for(; (i < r[DIR]) && (temp[DIR] < current[DIR]) ; ++i){
+            generate_loops<DIR + 1, FUNCTOR, ARR_VEC, F_ARG_ARR...>(temp,
                 r, F, reflect, pos_vec, fargs...);
             ++temp[DIR];
           }
         } else {
-          temp[DIR] = NN[DIR] - 1;
+          // assert(temp[DIR] == NN[DIR] - 1);
           std::get<1>(reflect[DIR]) = true;
-          for(; (temp[DIR] > current[DIR]) && (i < r[DIR]); ++i){
-            generate_loops<DIR - 1, FUNCTOR, ARR_VEC, F_ARG_ARR...>(temp,
+          for(; i < r[DIR]; ++i){
+            generate_loops<DIR + 1, FUNCTOR, ARR_VEC, F_ARG_ARR...>(temp,
                 r, F, reflect, pos_vec, fargs...);
+            // Just in case
+            if(temp[DIR] == 0)
+              break;
             --temp[DIR];
           }
           std::get<1>(reflect[DIR]) = false;
@@ -223,24 +215,24 @@ struct ChainingMesh{
 
       // -, ``left''
       temp = current;
-      for(i = 0; (temp[DIR] > 0) && (i < r[DIR]); ++i){
+      for(i = 0; (i < r[DIR]) && (temp[DIR] > 0); ++i){
         --temp[DIR];
-        generate_loops<DIR - 1, FUNCTOR, ARR_VEC, F_ARG_ARR...>(temp,
+        generate_loops<DIR + 1, FUNCTOR, ARR_VEC, F_ARG_ARR...>(temp,
             r, F, reflect, pos_vec, fargs...);
       }
       if(i < r[DIR]){
         if constexpr(PERIODIC[DIR]){
           temp[DIR] = NN[DIR] - 1;
-          for(; (temp[DIR] > current[DIR]) && (i < r[DIR]); ++i){
-            generate_loops<DIR - 1, FUNCTOR, ARR_VEC, F_ARG_ARR...>(temp,
+          for(; (i < r[DIR]) && (temp[DIR] > current[DIR]); ++i){
+            generate_loops<DIR + 1, FUNCTOR, ARR_VEC, F_ARG_ARR...>(temp,
                 r, F, reflect, pos_vec, fargs...);
             --temp[DIR];
           }
         } else {
-          temp[DIR] = 0;
+          // assert(temp[DIR] == 0);
           std::get<0>(reflect[DIR]) = true;
-          for(; (temp[DIR] < current[DIR]) && (i < r[DIR]); ++i){
-            generate_loops<DIR - 1, FUNCTOR, ARR_VEC, F_ARG_ARR...>(temp,
+          for(; (i < r[DIR]) && (temp[DIR] < NN[DIR]); ++i){
+            generate_loops<DIR + 1, FUNCTOR, ARR_VEC, F_ARG_ARR...>(temp,
                 r, F, reflect, pos_vec, fargs...);
             ++temp[DIR];
           }
@@ -249,7 +241,7 @@ struct ChainingMesh{
       }
 
       // 0, add self/center
-      generate_loops<DIR - 1, FUNCTOR, ARR_VEC, F_ARG_ARR...>(current,
+      generate_loops<DIR + 1, FUNCTOR, ARR_VEC, F_ARG_ARR...>(current,
           r, F, reflect, pos_vec, fargs...);
     }
   }
@@ -274,7 +266,7 @@ struct ChainingMesh{
     }
 
     // Generate the loops at compile-time
-    generate_loops<DIM - 1, FUNCTOR>(current, r, F, reflect, pos_vec,
+    generate_loops<0, FUNCTOR>(current, r, F, reflect, pos_vec,
                                      fargs...); 
   }
   
