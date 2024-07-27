@@ -58,8 +58,6 @@ int main(int argc, char* argv[]) {
   std::vector<T> m_part_0;
   std::vector<T> uint_part_0;
 
-  //Initializing random particle positions and velocities within Manager object
-
   std::mt19937 gen_2(0); // Mersenne Twister pseudo-random generator, seeded with 0
   // Uniform distribution between 0 and 1
   std::uniform_real_distribution<> rand01(0.0, 1.0); 
@@ -198,23 +196,23 @@ int main(int argc, char* argv[]) {
 
 			// float t = (color_q(j) - minv) / ((maxv - minv + 0.001));
       float x = color_q(j);
-			float L0 = (x - avg)  * (x - maxv)/((minv - avg)  * (minv - maxv)),
-            L1 = (x - minv) * (x - maxv)/((avg - minv)  * (avg - maxv)),
-            L2 = (x - minv) * (x - avg) /((maxv - minv) * (maxv - avg));
-      float t = 0. * L0 + 0.5 * L1 + 1. * L2;
-      t = x/(maxv - minv) - minv/(maxv - minv);
+			//float L0 = (x - avg)  * (x - maxv)/((minv - avg)  * (minv - maxv)),
+      //      L1 = (x - minv) * (x - maxv)/((avg - minv)  * (avg - maxv)),
+      //      L2 = (x - minv) * (x - avg) /((maxv - minv) * (maxv - avg));
+      //float t = 0. * L0 + 0.5 * L1 + 1. * L2;
+      float t = x/(maxv - minv) - minv/(maxv - minv);
 			sf::Color color(static_cast<sf::Uint8>(255 * t),
                       0, 
                       static_cast<sf::Uint8>(255 * (1 - t)));
       //if(minn == manager.count_neighbors(j))
 			//  color = sf::Color(0, 255, 0);
 
-      x = manager.smoothing_kernel_sizes(j);
-			L0 = (x - avgh)  * (x - maxh)/((minh - avgh)  * (minh - maxh));
-      L1 = (x - minh) * (x - maxh)/((avgh - minh)  * (avgh - maxh));
-      L2 = (x - minh) * (x - avgh) /((maxh - minh) * (maxh - avgh));
+      //x = manager.smoothing_kernel_sizes(j);
+			//L0 = (x - avgh)  * (x - maxh)/((minh - avgh)  * (minh - maxh));
+      //L1 = (x - minh) * (x - maxh)/((avgh - minh)  * (avgh - maxh));
+      //L2 = (x - minh) * (x - avgh) /((maxh - minh) * (maxh - avgh));
 
-      t = 0. * L0 + 0.5 * L1 + 1. * L2;
+      //t = 0. * L0 + 0.5 * L1 + 1. * L2;
 
 			sf::CircleShape circle(5);//. + 4.*t);
 
