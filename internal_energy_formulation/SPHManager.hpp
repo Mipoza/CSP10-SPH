@@ -11,11 +11,12 @@
 #include <limits>
 
 #define MAX(x, y) (x > y ? x : y)
+#define MIN(x, y) (x < y ? x : y)
 #define eps (8*std::numeric_limits<T>::epsilon())
 
 template <unsigned DIM>
 constexpr auto SPHERE_VOL_FAC(){
-    return std::pow(M_PI, DIM/2.)/std::tgamma(DIM/2. + 1);
+    return Kokkos::pow(M_PI, DIM/2.)/std::tgamma(DIM/2. + 1);
 }
 
 template<typename T, unsigned int DIM, 
@@ -65,7 +66,7 @@ struct SPHManager {
                          const T& h) const {
       const T rij = Kokkos::sqrt(dis.dot(dis));
       const T dot_product = dis.dot(vel);
-      const T mu = h*dot_product/(std::pow(rij, 2) + 0.01*std::pow(h, 2));
+      const T mu = h*dot_product/(Kokkos::pow(rij, 2) + 0.01*Kokkos::pow(h, 2));
 
       return std::make_pair(mu, dot_product < 0 ? 
           (-(alpha * c * mu) + (beta * mu * mu)) / (density + eps) : 0);
@@ -75,7 +76,7 @@ struct SPHManager {
     // periodic boundary conditions
     template <unsigned DIR = 0>
     __attribute__((always_inline))
-    T dist2(const Vec<T, DIM>& x, const Vec<T, DIM>& y, T res = 0){
+    T dist2(const Vec<T, DIM>& x, const Vec<T, DIM>& y, T&& res = 0){
       if constexpr(DIR < DIM){
         T d = y[DIR] - x[DIR];
         if constexpr(PERIODIC[DIR]){
@@ -91,7 +92,7 @@ struct SPHManager {
 
     KOKKOS_INLINE_FUNCTION
     T dist(const Vec<T, DIM>& x, const Vec<T, DIM>& y){
-      return std::sqrt(dist2(x, y));
+      return Kokkos::sqrt(dist2(x, y));
     }
 
     template <unsigned DIR = 0>
@@ -121,8 +122,6 @@ struct SPHManager {
     // For debugging
     std::size_t count_neighbors(const std::size_t p_idx){
       std::size_t count = 0;
-      //unsigned duplicate = 0;
-      // Loop over neighbor cells
       CM.it_over_neighbors(position(p_idx), 
          K.supp_radius*smoothing_kernel_sizes(p_idx), 
         [&] (const std::size_t other_idx,
@@ -132,8 +131,6 @@ struct SPHManager {
           if(rij < K.supp_radius * smoothing_kernel_sizes(p_idx)) ++count;
         },
       position);
-      //if(duplicate > 1)
-      //  std::cout << "p_idx: " << p_idx << " " << duplicate << std::endl;
       return count;
     }
 
@@ -148,7 +145,7 @@ struct SPHManager {
       density = density_;
       Kokkos::View<T*> pressure_("Pressure", N);
       pressure = pressure_;
-      Kokkos::View<T*> pressure_dh_("Pressure", N);
+      Kokkos::View<T*> pressure_dh_("Pressure_dh", N);
       pressure_dh = pressure_dh_;
       Kokkos::View<T*> uint_("u", N);
       uint = uint_;
@@ -158,10 +155,8 @@ struct SPHManager {
       n  = n_;
       Kokkos::View<T*> n_dh_("n_dh", N);
       n_dh  = n_dh_;
-      if constexpr(viscous && balsara){
-        Kokkos::View<T*> div_v_("div_v", N);
-        div_v = div_v_;
-      }
+      Kokkos::View<T*> div_v_("div_v", N);
+      div_v = div_v_;
       Kokkos::View<T*> smoothing_kernel_sizes_("Smoothing Kernel Sizes", N);
       smoothing_kernel_sizes = smoothing_kernel_sizes_;
       // Set all smoothing kernel sizes to h
@@ -212,7 +207,7 @@ struct SPHManager {
       // Set it to something
       if(n_target_< 0)
         n_target = K(0., h) * 
-                      std::pow(h*K.supp_radius, DIM)
+                      Kokkos::pow(h*K.supp_radius, DIM)
                       * (-n_target_);
       else 
         n_target = n_target_;
@@ -221,34 +216,41 @@ struct SPHManager {
       // before the first step
       updateNeighbors();
       compute_kernels();
-      smoothen<viscous, false>();
     }
 
 
     // Update the ChainingMesh
-    template <typename... ARGS>
+    template <bool SORT_ONLY_NON_SMOOTHED = false, typename... ARGS>
     void updateNeighbors(ARGS&... optional_sort){
       CM.partition(position);
       // Sort for data locality
-      if constexpr(viscous && balsara){
-        CM.sort(position, mass, n, n_dh, smoothing_kernel_sizes, 
-                          density, pressure, pressure_dh, dt_loc,
-                          uint, du, velocity, accel, div_v, curl_v,
+      // NOTE: position is overwritten at the end
+      // no other way, bc we would get race-conditions otherwise
+      if constexpr(SORT_ONLY_NON_SMOOTHED){
+        CM.sort(position, mass, smoothing_kernel_sizes, 
+                          uint, velocity, position,
                           optional_sort...);
       }
-      else { 
-        CM.sort(position, mass, n, n_dh, smoothing_kernel_sizes, 
-                          density, pressure, pressure_dh,
-                          uint, du, velocity, accel, dt_loc,
-                          optional_sort...);
+      else {
+        if constexpr(viscous && balsara){
+          CM.sort(position, mass, n, n_dh, smoothing_kernel_sizes, 
+                            density, pressure, pressure_dh, dt_loc,
+                            uint, du, velocity, accel, div_v, curl_v,
+                            position,
+                            optional_sort...);
+        }
+        else { 
+          CM.sort(position, mass, n, n_dh, smoothing_kernel_sizes, 
+                            density, pressure, pressure_dh, dt_loc,
+                            uint, du, velocity, accel,
+                            position,
+                            optional_sort...);
+        }
       }
-      
-      // AT THE END, sort position
-      CM.sort(position, position);
     }
 
     // Compute the "number density"
-    KOKKOS_INLINE_FUNCTION T
+    KOKKOS_INLINE_FUNCTION T __attribute__((always_inline))
     compute_n_density(const std::size_t p_idx, const T h_loc){
       T n = 0;
       // Loop over neighbor cells
@@ -260,7 +262,7 @@ struct SPHManager {
           n += K(rij, h_loc*h);
         },
       position);
-      return std::move(n * std::pow(h_loc*h*K.supp_radius, DIM));
+      return std::move(n * Kokkos::pow(h_loc*h*K.supp_radius, DIM));
     }
 
     void compute_kernels(){
@@ -285,7 +287,7 @@ struct SPHManager {
             fac = illinois(h0, h1, my_mass_func);
           } else if(current_n < n_target){
             // Opposite, give a slope which goes towards bigger h
-            h1 = std::min(h_current * n_target/(current_n + eps),
+            h1 = MIN(h_current * n_target/(current_n + eps),
                           2 * h_current);
             h0 = h_current;
             fac = illinois(h0, h1, my_mass_func);
@@ -320,7 +322,7 @@ struct SPHManager {
                  const Vec<T, DIM>& other_pos,
                  const Vec<T, DIM>& other_vel){
               const Vec<T, DIM> d = dist_vec(position(p_idx), other_pos);
-              const T rij = std::sqrt(d.dot(d));
+              const T rij = Kokkos::sqrt(d.dot(d));
               const T W_ij = K(rij, smoothing_kernel_sizes(p_idx));
               const T W_ij_dh = K.grad_h(rij, smoothing_kernel_sizes(p_idx));
 
@@ -387,7 +389,7 @@ struct SPHManager {
           du(p_idx) = 0.0;
           const T fij_fac = 1./(1 + 
               smoothing_kernel_sizes(p_idx)*n_dh(p_idx)/(DIM * n(p_idx)));
-          const T ci = std::sqrt(abs(Adiabatic_index*pressure(p_idx)/
+          const T ci = Kokkos::sqrt(abs(Adiabatic_index*pressure(p_idx)/
                         (density(p_idx) + eps)));
           dt_loc(p_idx) = dt_max;
           // Loop over neighbor cells
@@ -421,7 +423,7 @@ struct SPHManager {
                         * mass(p_idx) * uint(p_idx)
                       ))*fji_fac)/(pressure(other_idx) + eps);
 
-                  accel(p_idx) -= std::pow(Adiabatic_index - 1, 2) * mass(other_idx) *
+                  accel(p_idx) -= Kokkos::pow(Adiabatic_index - 1, 2) * mass(other_idx) *
                                   uint(p_idx) * uint(other_idx) * (
                       fij * (((d)*
                           K.grad_r(rij, smoothing_kernel_sizes(p_idx)))/(rij + eps)) +
@@ -429,7 +431,7 @@ struct SPHManager {
                           K.grad_r(rij, smoothing_kernel_sizes(other_idx)))/(rij + eps))
                       );
 
-                  du(p_idx) += std::pow(Adiabatic_index - 1, 2) * mass(other_idx) *
+                  du(p_idx) += Kokkos::pow(Adiabatic_index - 1, 2) * mass(other_idx) *
                                   uint(p_idx) * uint(other_idx) * (
                       fij * dv.dot(((d)*
                           K.grad_r(rij, smoothing_kernel_sizes(p_idx)))/(rij + eps))
@@ -442,7 +444,7 @@ struct SPHManager {
                   const T density_mean = (density(other_idx) + density(p_idx))/2.;
                   // Mean sound velocity
                   const T c_ij_bar = (ci +
-                      std::sqrt(abs(Adiabatic_index*pressure(other_idx)/
+                      Kokkos::sqrt(abs(Adiabatic_index*pressure(other_idx)/
                           (density(other_idx) + eps))))/2.;
 
                   const T mean_h = 0.5*(smoothing_kernel_sizes(p_idx) +
@@ -455,13 +457,13 @@ struct SPHManager {
                   T fij_balsara = 1;
                   if constexpr(balsara){
                     // Balsara factor
-                    const T fi = std::abs(div_v(p_idx))/(
-                        std::abs(div_v(p_idx)) + 0*curl_v(p_idx).norm() + // c_i/h_i 
+                    const T fi = Kokkos::abs(div_v(p_idx))/(
+                        Kokkos::abs(div_v(p_idx)) + 0*curl_v(p_idx).norm() + // c_i/h_i 
                         1e-4 * ci/smoothing_kernel_sizes(p_idx)
                         );
-                    const T fj = std::abs(div_v(other_idx))/(
-                        std::abs(div_v(other_idx)) + 0*other_curl.norm() + // c_j/h_j 
-                        1e-4 * std::sqrt(abs(Adiabatic_index*pressure(other_idx)/
+                    const T fj = Kokkos::abs(div_v(other_idx))/(
+                        Kokkos::abs(div_v(other_idx)) + 0*other_curl.norm() + // c_j/h_j 
+                        1e-4 * Kokkos::sqrt(abs(Adiabatic_index*pressure(other_idx)/
                             (density(other_idx) + eps)))/
                           smoothing_kernel_sizes(other_idx)
                         );
@@ -477,10 +479,10 @@ struct SPHManager {
                                 smoothing_kernel_sizes(other_idx)))/(rij + eps));
                 }
                 // Compute maximal time-step
-                dt_loc(p_idx) = std::min(dt_loc(p_idx),
+                dt_loc(p_idx) = MIN(dt_loc(p_idx),
                     static_cast<T>(
                       (0.5 * smoothing_kernel_sizes(p_idx) * K.supp_radius /(
-                      eps + (1 + 0.6 * alpha) * ci + 0.6 * beta * std::abs(std::min(
+                      eps + (1 + 0.6 * alpha) * ci + 0.6 * beta * Kokkos::abs(MIN(
                                                             static_cast<T>(0), mu_ij)))
                     )
                   )
@@ -538,7 +540,6 @@ struct SPHManager {
       const std::size_t N_particles = position.size();
       dt = CFL * (*Kokkos::Experimental::min_element(Kokkos::DefaultExecutionSpace(),
                                                      dt_loc));
-      //dt = dt_max;
       avgh = 0;
 
       Kokkos::parallel_reduce(N_particles, 
@@ -566,7 +567,7 @@ struct SPHManager {
         compute_kernels();
       }
       // Split-step approach with Strang-Splitting
-      if constexpr(false && viscous){
+      if constexpr(viscous){
         dt /= 2;
         rk2_step<true, true>();
 
@@ -640,10 +641,10 @@ struct SPHManager {
       // smoothen() comes in the next step
     }
 
-    template <bool VISC = viscous, bool ONLY_VISC = false>
+    template <bool VISC = viscous, bool ONLY_VISC_SMOOTH = false>
     inline void verlet_step() { 
       const std::size_t N_particles = position.size();
-      smoothen<VISC, ONLY_VISC>();
+      smoothen<VISC, ONLY_VISC_SMOOTH>();
       // Kick & Drift
       Kokkos::parallel_for(N_particles, 
         KOKKOS_LAMBDA (const std::size_t p_idx){
@@ -652,8 +653,7 @@ struct SPHManager {
           // Update position
           position(p_idx) += velocity(p_idx) * dt;
           // Update uint, only changes if we have viscosity
-          if constexpr(VISC)
-            uint(p_idx) += du(p_idx) * dt / 2.;
+          uint(p_idx) += du(p_idx) * dt / 2.;
           // Apply boundary conditions
           apply_bcs(p_idx);
         }
@@ -666,14 +666,13 @@ struct SPHManager {
       // Update acceleration
       updateNeighbors();
       compute_kernels();
-      smoothen<VISC, ONLY_VISC>();
+      smoothen<VISC, ONLY_VISC_SMOOTH>();
 
       // Kick again
       Kokkos::parallel_for(N_particles, 
         KOKKOS_LAMBDA (const std::size_t p_idx){
           // Update uint, only changes if we have viscosity
-          if constexpr(VISC)
-            uint(p_idx) += du(p_idx) * dt / 2.;
+          uint(p_idx) += du(p_idx) * dt / 2.;
           // Update velocity with the other half of the acceleration
           velocity(p_idx) += accel(p_idx) * dt / 2.;
         }

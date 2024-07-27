@@ -80,13 +80,13 @@ struct ChainingMesh{
 
   // Turn the "tuple" into a key/index
   template <int DIR = 0>
-  KOKKOS_INLINE_FUNCTION IDX_TYPE 
+  constexpr KOKKOS_INLINE_FUNCTION IDX_TYPE 
   idx_to_key(const std::array<IDX_TYPE, DIM>& idx) const {
     if constexpr(DIR + 1 == DIM){
-      return idx[DIR];
+      return std::move(idx[DIR]);
     }
     else {
-      return idx[DIR] + NN[DIR] * idx_to_key<DIR + 1>(std::move(idx)); 
+      return std::move(idx[DIR] + NN[DIR] * idx_to_key<DIR + 1>(idx));
     }
   }
 
@@ -117,8 +117,7 @@ struct ChainingMesh{
   }
 
   template <typename VEC, bool ABSOLUTE_POS = false, int DIR = 0>
-  void KOKKOS_INLINE_FUNCTION
-  __attribute__((always_inline))
+  constexpr void KOKKOS_INLINE_FUNCTION
   reflect_vec(
       VEC& v, 
       const std::array<std::tuple<bool, bool>, DIM>& reflect) const {
@@ -126,14 +125,16 @@ struct ChainingMesh{
       if constexpr(!ABSOLUTE_POS){ // Reflect e.g. velocity, just flip a sign
         if(std::get<0>(reflect[DIR]) ||
            std::get<1>(reflect[DIR])){
-          v[DIR] *= -1;
+          v[DIR] = -v[DIR];
          }
       }
       else { // Reflect the absolute position
         if(std::get<0>(reflect[DIR]))
-          v[DIR] = 2*low[DIR] - v[DIR] - _eps;
+          v[DIR] = 2*low[DIR] - v[DIR] - 2*_eps; // Add eps, otherwise
+                                                 // particles might "collide"
+                                                 // with themselves at the boundary
         else if(std::get<1>(reflect[DIR])) // Assumption: radius < L[DIR]
-          v[DIR] = 2*(low[DIR] + L[DIR]) - v[DIR] + _eps;
+          v[DIR] = 2*(low[DIR] + L[DIR]) - v[DIR] + 2*_eps;
       }
     }
 
@@ -147,7 +148,7 @@ struct ChainingMesh{
   template <int DIR, typename FUNCTOR,
             typename ARR_VEC,
             typename... F_ARG_ARR>
-  KOKKOS_INLINE_FUNCTION constexpr
+  constexpr KOKKOS_INLINE_FUNCTION
   void generate_loops(
       std::array<IDX_TYPE, DIM>& current,
       const std::array<IDX_TYPE, DIM>& r,
@@ -170,12 +171,12 @@ struct ChainingMesh{
           auto v = arr(other_idx);
           // Tacitly assume that the rest only needs to be reflected by sign
           reflect_vec<decltype(v), false, 0>(v, reflect);
-          return v;
+          return std::move(v);
         };
 
         auto other_pos = pos_vec(other_idx);
         reflect_vec<decltype(other_pos), true, 0>(other_pos, reflect);
-
+        
         F(std::move(other_idx), 
           std::move(other_pos), 
           std::move(get_val(fargs))...);
@@ -286,7 +287,7 @@ struct ChainingMesh{
   }
 
   template <unsigned I, typename... TYPE_PACK>
-  constexpr inline void __attribute__((always_inline))
+  constexpr void KOKKOS_INLINE_FUNCTION
   reassign(const IDX_TYPE& new_idx, const IDX_TYPE& i,
            const std::tuple<TYPE_PACK...>& dest, 
            const std::tuple<TYPE_PACK...>& src){
@@ -297,7 +298,7 @@ struct ChainingMesh{
   }
 
   template <unsigned I, typename... TYPE_PACK>
-  constexpr inline void __attribute__((always_inline))
+  constexpr inline void
   deepcopy(std::tuple<TYPE_PACK...>& dest, 
            std::tuple<TYPE_PACK...>& src){
     if constexpr(I < sizeof...(TYPE_PACK)){
@@ -320,7 +321,7 @@ struct ChainingMesh{
     // Create temporaries
     std::tuple<TARGET_T...> temps = create_temps(targets_...);
     std::tuple<TARGET_T...> targets(targets_...);
-    const std::size_t N_particles = std::get<0>(targets).size();
+    const std::size_t N_particles = pos.size();
     // Copy in the right order
     Kokkos::parallel_for("Reorder-Loop", N_particles,
       KOKKOS_LAMBDA (const IDX_TYPE i){

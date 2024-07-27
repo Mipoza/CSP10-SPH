@@ -13,6 +13,7 @@ struct Vec: std::array<T, DIM> {
   template <typename... COORDS>
   Vec(COORDS... c): std::array<T, DIM>({static_cast<T>(c)...}){}
   // Assignment
+  KOKKOS_INLINE_FUNCTION
   Vec& operator=(const Vec& other){
     #pragma GCC ivdep
     for(unsigned d = 0; d < DIM; ++d)
@@ -20,6 +21,7 @@ struct Vec: std::array<T, DIM> {
     return *this;
   }
   // Assignment
+  KOKKOS_INLINE_FUNCTION
   Vec& operator=(const T& s){
     #pragma GCC ivdep
     for(unsigned d = 0; d < DIM; ++d)
@@ -27,21 +29,24 @@ struct Vec: std::array<T, DIM> {
     return *this;
   }
   // Add-assign
-  inline Vec& operator+=(const Vec& other){
+  KOKKOS_INLINE_FUNCTION
+  Vec& operator+=(const Vec& other){
     #pragma GCC ivdep
     for(unsigned d = 0; d < DIM; ++d)
       this->operator[](d) += other[d];
     return *this;
   }
   // Sub-assign
-  inline Vec& operator-=(const Vec& other){
+  KOKKOS_INLINE_FUNCTION
+  Vec& operator-=(const Vec& other){
     #pragma GCC ivdep
     for(unsigned d = 0; d < DIM; ++d)
       this->operator[](d) -= other[d];
     return *this;
   }
   // Unary minus
-  inline Vec operator-() const{
+  KOKKOS_INLINE_FUNCTION
+  Vec operator-() const{
     Vec res = *this;
     #pragma GCC ivdep
     for(unsigned d = 0; d < DIM; ++d)
@@ -49,13 +54,15 @@ struct Vec: std::array<T, DIM> {
     return res;
   }
   // With scalars
-  inline Vec operator*=(const T& s){
+  KOKKOS_INLINE_FUNCTION
+  Vec operator*=(const T& s){
     #pragma GCC ivdep
     for(unsigned d = 0; d < DIM; ++d)
       this->operator[](d) *= s;
     return *this;
   }
-  inline Vec operator/=(const T& s){
+  KOKKOS_INLINE_FUNCTION
+  Vec operator/=(const T& s){
     #pragma GCC ivdep
     for(unsigned d = 0; d < DIM; ++d)
       this->operator[](d) /= s;
@@ -63,30 +70,35 @@ struct Vec: std::array<T, DIM> {
   }
 
   // Addition
-  inline friend Vec operator+(const Vec& a, const Vec& b){
+  KOKKOS_INLINE_FUNCTION
+  friend Vec operator+(const Vec& a, const Vec& b){
     Vec res = a;
     res += b;
     return res;
   }
   // Subtraction
-  inline friend Vec operator-(const Vec& a, const Vec& b){
+  KOKKOS_INLINE_FUNCTION
+  friend Vec operator-(const Vec& a, const Vec& b){
     Vec res = a;
     res -= b;
     return res;
   }
   // Multiplication with a scalar
-  inline friend Vec operator*(const T& a, const Vec& b){
+  KOKKOS_INLINE_FUNCTION
+  friend Vec operator*(const T& a, const Vec& b){
     Vec res = b;
     #pragma GCC ivdep
     for(unsigned d = 0; d < DIM; ++d)
       res[d] *= a;
     return res;
   }
-  inline friend Vec operator*(const Vec& b, const T& a){
+  KOKKOS_INLINE_FUNCTION
+  friend Vec operator*(const Vec& b, const T& a){
     return a*b;
   }
   // Division with a scalar
-  inline friend Vec operator/(const Vec& a, const T& b){
+  KOKKOS_INLINE_FUNCTION
+  friend Vec operator/(const Vec& a, const T& b){
     Vec res = a;
     #pragma GCC ivdep
     for(unsigned d = 0; d < DIM; ++d)
@@ -95,7 +107,8 @@ struct Vec: std::array<T, DIM> {
   }
 
   // Dot product
-  inline T dot(const Vec& other) const {
+  KOKKOS_INLINE_FUNCTION
+  T dot(const Vec& other) const {
     T sum = 0;
     for(unsigned d = 0; d < DIM; ++d)
       sum += this->operator[](d)*other[d];
@@ -103,7 +116,8 @@ struct Vec: std::array<T, DIM> {
   }
 
   // Norm
-  inline T norm() const {
+  KOKKOS_INLINE_FUNCTION
+  T norm() const {
     return std::sqrt(this->dot(*this));
   }
 

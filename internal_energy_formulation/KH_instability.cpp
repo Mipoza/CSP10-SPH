@@ -40,18 +40,19 @@ int main(int argc, char* argv[]) {
 
   T CFL = 0.8;
   T dt_max = 1;
-  unsigned N_particles = 2048;
-	const T h = 1e-1;
+  unsigned N_particles = 2 << 10;
+	const T h = 4/std::sqrt(N_particles);
 
-  constexpr static const bool periodic[2] = {false, false};
+  constexpr static const bool periodic[2] = {true, true};
   constexpr bool visc = true;
   constexpr bool balsara = true;
-  const T alpha = 0.6;
+  const T alpha = 0.2;
   const T beta = 2*alpha;
+  const T Adiabatic_index = 1.4;
 
   SPHManager<T, DIM, periodic, visc, balsara,
              QuinticSplineKernel<T, DIM>> 
-  manager(origin, extent, CFL, h, 1.3, dt_max, alpha, beta);
+  manager(origin, extent, CFL, h, Adiabatic_index, dt_max, alpha, beta);
   std::vector<Vec<T, DIM>> R_part_0;
   std::vector<Vec<T, DIM>> v_part_0;
   std::vector<T> m_part_0;
@@ -63,27 +64,30 @@ int main(int argc, char* argv[]) {
   // Uniform distribution between 0 and 1
   std::uniform_real_distribution<> rand01(0.0, 1.0); 
 
+  const T v = 10;
+  const T amplitude_pert = 1e-1;
+  const T amplitude_freq = 2;
   const T box_width = 1.0;
   const T box_height = 1.0;
   const T density_ = 1e3;
-  const T velocity_1 = -10; // Velocity of the top layer
-  const T velocity_2 =  10; // Velocity of the bottom layer
+  const T velocity_1 = -v; // Velocity of the top layer
+  const T velocity_2 =  v; // Velocity of the bottom layer
 
   // Example mass per particle assuming equal distribution initially
   const T mass = (density_ * box_width * box_height) / N_particles;
-  const T A = 1e2 * mass;
+  const T A = 1e3 * mass;
 
   unsigned N_side = static_cast<unsigned>(std::sqrt(N_particles));
-  const T dx = box_width / N_side;
+  const T dx = box_width / (N_side - 1);
   // const T dy = (box_height / 2.0) / N_side;
   const unsigned Ny = 2 * (N_side / 2);
   const T dy = box_height / (Ny - 1);
 
   const bool random_positions = false;
 
-  for (unsigned i = 0; i < N_side; i++) {
+  for (unsigned i = 0; i < N_side - !random_positions; i++) {
     // T x = rand01(gen_2);
-    for (unsigned j = 0; j < Ny/(1 + random_positions); j++) {
+    for (unsigned j = 0; j < Ny/(1 + random_positions) - !random_positions; j++) {
       T x, y;
       if(random_positions){
         y = rand01(gen_2)*extent[1]/2.;
@@ -101,11 +105,17 @@ int main(int argc, char* argv[]) {
         uint_part_0.push_back(A);
         uint_part_0.push_back(A);
       } else {
-        // Issues with the numerical accuracy
-        x = 1e-4 + i * dx * (1 - 2e-4);
-        y = 1e-4 + j * dy * (1 - 2e-4);
+        x = (i + 0.5) * dx;
+        y = (j + 0.5) * dy;
+        //x = 1e-4 + i * dx * (1 - 2e-4);
+        //y = 1e-4 + j * dy * (1 - 2e-4);
         R_part_0.push_back(Vec<T, 2>(x, y));
-        v_part_0.push_back(Vec<T, 2>(j < Ny/2 ? velocity_1 : velocity_2, 0.0));
+        v_part_0.push_back(Vec<T, 2>(
+              y < 1/3. ? velocity_1 :(y > 2/3. ? velocity_1 : velocity_2), 
+              ((std::abs(y - 1./3) < 1e-1) || (std::abs(y - 2./3) < 1e-1)) ? 
+                amplitude_pert*std::sin(2*M_PI*amplitude_freq*x) : 0
+              )
+            );
         m_part_0.push_back(mass);
         uint_part_0.push_back(A);
       }
@@ -127,15 +137,17 @@ int main(int argc, char* argv[]) {
   window.clear(sf::Color::Black);
 
   auto color_q = [&](const std::size_t& p_idx){
+    // return manager.pressure(p_idx);
     // return manager.density(p_idx);
-    return manager.pressure(p_idx);
+    // return manager.pressure(p_idx)/std::pow(manager.density(p_idx), Adiabatic_index);
+    // return manager.uint(p_idx);
     // return std::abs(manager.div_v(p_idx));
-    // return std::sqrt(manager.velocity(p_idx)
-    //                  .dot(manager.velocity(p_idx)));
-    // return manager.curl_v(p_idx).norm();
+    // return std::sqrt(manager.velocity(p_idx).norm());
+    // return std::abs(manager.velocity(p_idx)[1]);
+    return manager.curl_v(p_idx).norm();
   };
 
-  const unsigned print_freq = 32;
+  const unsigned print_freq = 16;
 	const unsigned int N_times = 10000;
 	for (unsigned int i = 0; i < N_times; i++){
 		window.clear();
@@ -204,7 +216,7 @@ int main(int argc, char* argv[]) {
 
       t = 0. * L0 + 0.5 * L1 + 1. * L2;
 
-			sf::CircleShape circle(3. + 4.*t);
+			sf::CircleShape circle(5);//. + 4.*t);
 
 			circle.setFillColor(color);
 
@@ -226,7 +238,7 @@ int main(int argc, char* argv[]) {
 
 		window.display();
     manager.step();
-    //usleep(10000);
+    // sleep(1);
   }
 
   Kokkos::finalize();
