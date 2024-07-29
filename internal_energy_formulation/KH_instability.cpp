@@ -51,7 +51,7 @@ int main(int argc, char* argv[]) {
   const T Adiabatic_index = 1.4;
 
   SPHManager<T, DIM, periodic, visc, balsara,
-             QuinticSplineKernel<T, DIM>> 
+             CubicSplineKernel<T, DIM>> 
   manager(origin, extent, CFL, h, Adiabatic_index, dt_max, alpha, beta);
   std::vector<Vec<T, DIM>> R_part_0;
   std::vector<Vec<T, DIM>> v_part_0;
