@@ -1,0 +1,3 @@
+/home/me/Documents/tmp/internal_energy_formulation/build/CMakeFiles/KHInstability.dir
+/home/me/Documents/tmp/internal_energy_formulation/build/CMakeFiles/edit_cache.dir
+/home/me/Documents/tmp/internal_energy_formulation/build/CMakeFiles/rebuild_cache.dir
