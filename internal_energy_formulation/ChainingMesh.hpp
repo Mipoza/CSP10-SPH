@@ -70,7 +70,6 @@ struct ChainingMesh{
     std::array<IDX_TYPE, DIM> idx;
     // Multiply with 1 - eps
     // It does not like values at the boundary
-    #pragma GCC unroll(DIM)
     for(unsigned i = 0; i < DIM; ++i)
       idx[i] = static_cast<IDX_TYPE>((pos[i] - low[i])*
           (static_cast<T>(1) - _eps)

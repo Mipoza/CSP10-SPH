@@ -41,17 +41,17 @@ int main(int argc, char* argv[]) {
   T CFL = 0.8;
   T dt_max = 1;
   unsigned N_particles = 2 << 10;
-	const T h = 4/std::sqrt(N_particles);
+	const T h = 8/std::sqrt(N_particles);
 
   constexpr static const bool periodic[2] = {true, true};
   constexpr bool visc = true;
   constexpr bool balsara = true;
-  const T alpha = 0.2;
+  const T alpha = 0.6;
   const T beta = 2*alpha;
   const T Adiabatic_index = 1.4;
 
   SPHManager<T, DIM, periodic, visc, balsara,
-             CubicSplineKernel<T, DIM>> 
+             QuinticSplineKernel<T, DIM>> 
   manager(origin, extent, CFL, h, Adiabatic_index, dt_max, alpha, beta);
   std::vector<Vec<T, DIM>> R_part_0;
   std::vector<Vec<T, DIM>> v_part_0;
@@ -110,7 +110,7 @@ int main(int argc, char* argv[]) {
         R_part_0.push_back(Vec<T, 2>(x, y));
         v_part_0.push_back(Vec<T, 2>(
               y < 1/3. ? velocity_1 :(y > 2/3. ? velocity_1 : velocity_2), 
-              ((std::abs(y - 1./3) < 1e-1) || (std::abs(y - 2./3) < 1e-1)) ? 
+              ((std::abs(y - 1./3) < 0.1) || (std::abs(y - 2./3) < 0.1)) ? 
                 amplitude_pert*std::sin(2*M_PI*amplitude_freq*x) : 0
               )
             );
